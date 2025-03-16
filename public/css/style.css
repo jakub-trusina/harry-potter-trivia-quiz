@@ -824,4 +824,30 @@ input[type="text"] {
     visibility: hidden !important;
     opacity: 0 !important;
     pointer-events: none !important;
+}
+
+/* Add styles for auto-reveal */
+.answer-btn.correct-auto-reveal {
+    border: 3px solid green !important;
+    background-color: rgba(0, 128, 0, 0.2) !important;
+    position: relative;
+    animation: pulse-green 1s infinite;
+}
+
+.answer-reveal-label {
+    position: absolute;
+    top: -15px;
+    right: 10px;
+    background-color: green;
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-weight: bold;
+}
+
+@keyframes pulse-green {
+    0% { box-shadow: 0 0 0 0 rgba(0, 128, 0, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(0, 128, 0, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 128, 0, 0); }
 } 

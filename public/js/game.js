@@ -490,7 +490,29 @@ document.addEventListener('DOMContentLoaded', () => {
             answersContainer.appendChild(button);
         });
         
-        // Start timer for the quiz
+        // ===== NEW CODE: AUTO-REVEAL AFTER 3 SECONDS =====
+        // Schedule answer reveal after 3 seconds
+        let answerRevealTimerId = setTimeout(() => {
+            // Find the correct answer button and highlight it
+            const answerButtons = answersContainer.querySelectorAll('.answer-btn');
+            answerButtons.forEach((btn, index) => {
+                if (index === currentQuestion.correctAnswer) {
+                    btn.classList.add('correct-auto-reveal');
+                    
+                    // Add a small label that says "Correct Answer"
+                    const revealLabel = document.createElement('div');
+                    revealLabel.classList.add('answer-reveal-label');
+                    revealLabel.textContent = 'Correct Answer';
+                    btn.appendChild(revealLabel);
+                }
+            });
+        }, 3000);
+        
+        // Store this timer ID so we can clear it if needed
+        quizModal.dataset.answerRevealTimerId = answerRevealTimerId;
+        // ===== END NEW CODE =====
+        
+        // Set up the quiz timer
         let timeLeft = 30;
         timerElement.textContent = timeLeft;
         
@@ -521,9 +543,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function hideQuizModal() {
-        // Clear any active timers
+        // Clear the main quiz timer
         if (quizModal.dataset.timerId) {
             clearInterval(parseInt(quizModal.dataset.timerId));
+            quizModal.dataset.timerId = null;
+        }
+        
+        // Clear the answer reveal timer
+        if (quizModal.dataset.answerRevealTimerId) {
+            clearTimeout(parseInt(quizModal.dataset.answerRevealTimerId));
+            quizModal.dataset.answerRevealTimerId = null;
         }
         
         quizModal.classList.add('hidden');

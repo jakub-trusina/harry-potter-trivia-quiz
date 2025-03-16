@@ -90,4 +90,38 @@ A multiplayer territory conquest game with Harry Potter theme. Players answer qu
   - `index.js`: Server-side game logic
   - `public/js/game.js`: Client-side game logic
   - `public/css/style.css`: Game styling
-  - `public/index.html`: Game interface 
+  - `public/index.html`: Game interface
+
+### Finding Your Local IP Address
+
+#### On Windows:
+1. Open Command Prompt (search for "cmd" in the Start menu)
+2. Type `ipconfig` and press Enter
+3. Look for the "IPv4 Address" under your active network connection (usually "Ethernet adapter" or "Wireless LAN adapter")
+4. The IP address will look like `192.168.x.x` or `10.0.x.x`
+
+#### On macOS:
+1. Click the Apple menu and select "System Settings" (or "System Preferences" on older versions)
+2. Click on "Network"
+3. Select your active connection (Wi-Fi or Ethernet) from the left panel
+4. Your IP address will be displayed on the right side, labeled as "IP Address"
+
+#### On Linux:
+1. Open a terminal
+2. Type `ip addr show` or `ifconfig` and press Enter
+3. Look for your active connection (often "eth0" for Ethernet or "wlan0" for Wi-Fi)
+4. Find the "inet" or "inet addr" line, which shows your IP address (like `192.168.x.x`)
+
+#### Using the Terminal (all systems):
+* Windows Command Prompt: `ipconfig`
+* macOS/Linux Terminal: `ifconfig` or `ip addr show`
+
+After finding your IP address, other players on your network can connect to your game using:
+```
+http://YOUR_IP_ADDRESS:3000
+```
+
+For example, if your IP address is 192.168.1.5, they would use:
+```
+http://192.168.1.5:3000
+``` 
