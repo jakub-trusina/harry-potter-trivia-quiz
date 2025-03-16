@@ -1,0 +1,1214 @@
+[
+  {
+    "id": "q1",
+    "question": "What House at Hogwarts is known for bravery and courage?",
+    "answers": [
+      "Ravenclaw",
+      "Hufflepuff",
+      "Gryffindor",
+      "Slytherin"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q2",
+    "question": "What is the name of Harry Potter's owl?",
+    "answers": [
+      "Hedwig",
+      "Errol",
+      "Crookshanks",
+      "Pigwidgeon"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q3",
+    "question": "In which year does 'Hogwarts Legacy' take place?",
+    "answers": [
+      "1990s",
+      "1890s",
+      "1790s",
+      "1690s"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q4",
+    "question": "What magical object allows wizards to travel via fireplaces?",
+    "answers": [
+      "Portkey",
+      "Apparition",
+      "Floo Powder",
+      "Vanishing Cabinet"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q5",
+    "question": "Which spell is used to disarm an opponent?",
+    "answers": [
+      "Expelliarmus",
+      "Expecto Patronum",
+      "Wingardium Leviosa",
+      "Stupefy"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q6",
+    "question": "What achievement in Hogwarts Legacy requires defeating Ranrok?",
+    "answers": [
+      "The Hero of Hogwarts",
+      "The Sort Who Makes An Entrance",
+      "The Spell Master",
+      "The Avenging Gazelle"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q7",
+    "question": "Which of these is NOT one of the Deathly Hallows?",
+    "answers": [
+      "The Elder Wand",
+      "The Resurrection Stone",
+      "The Invisibility Cloak",
+      "The Time-Turner"
+    ],
+    "correctAnswer": 3,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q8",
+    "question": "In the Harry Potter universe, what is a Muggle?",
+    "answers": [
+      "A half-magical being",
+      "A non-magical person",
+      "A magical creature",
+      "A wizard born to non-magical parents"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q9",
+    "question": "What is the name of the magical town near Hogwarts?",
+    "answers": [
+      "Diagon Alley",
+      "Godric's Hollow",
+      "Hogsmeade",
+      "Little Whinging"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q10",
+    "question": "Which spell creates light at the end of a wand?",
+    "answers": [
+      "Incendio",
+      "Lumos",
+      "Nox",
+      "Illuminatus"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q11",
+    "question": "What is the name of the online platform created by J.K. Rowling for Harry Potter fans?",
+    "answers": [
+      "Wizarding World",
+      "Potter Portal",
+      "Pottermore",
+      "Hogwarts Online"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q12",
+    "question": "In 'Harry Potter: Magic Awakened', how many classes can students attend?",
+    "answers": [
+      "Five",
+      "Six",
+      "Seven",
+      "Eight"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "hard"
+  },
+  {
+    "id": "q13",
+    "question": "What achievement in Hogwarts Legacy requires you to win the House Cup?",
+    "answers": [
+      "The Seeker of Knowledge",
+      "The Hero of Hogwarts",
+      "The Spell Master",
+      "The Intrepid Explorer"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q14",
+    "question": "What is the core of Harry Potter's wand?",
+    "answers": [
+      "Dragon heartstring",
+      "Unicorn hair",
+      "Phoenix feather",
+      "Veela hair"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q15",
+    "question": "Which creature has the ability to turn invisible at will?",
+    "answers": [
+      "Niffler",
+      "Demiguise",
+      "Kneazle",
+      "Bowtruckle"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q16",
+    "question": "In Hogwarts Legacy, what is required to complete the achievement 'The Nature of the Beast'?",
+    "answers": [
+      "Defeat a dragon",
+      "Breed every type of beast",
+      "Rescue the phoenix",
+      "Defeat a troll"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q17",
+    "question": "Which spell is used to unlock doors?",
+    "answers": [
+      "Alohomora",
+      "Colloportus",
+      "Portus",
+      "Aperacium"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q18",
+    "question": "What type of dragon did Harry face in the Triwizard Tournament?",
+    "answers": [
+      "Common Welsh Green",
+      "Swedish Short-Snout",
+      "Chinese Fireball",
+      "Hungarian Horntail"
+    ],
+    "correctAnswer": 3,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q19",
+    "question": "Which potion gives the drinker luck?",
+    "answers": [
+      "Amortentia",
+      "Felix Felicis",
+      "Polyjuice Potion",
+      "Veritaserum"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q20",
+    "question": "What is the name of the Weasley family home?",
+    "answers": [
+      "The Nest",
+      "The Burrow",
+      "The Warren",
+      "The Hollow"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q21",
+    "question": "What was the name of Albus Dumbledore's phoenix?",
+    "answers": [
+      "Errol",
+      "Hermes",
+      "Fawkes",
+      "Hedwig"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q22",
+    "question": "In 'Harry Potter: Magic Awakened', what type of dance is called 'Flight of the Thestrals'?",
+    "answers": [
+      "Waltz",
+      "Tango",
+      "Funk",
+      "Flamenco"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "hard"
+  },
+  {
+    "id": "q23",
+    "question": "What does the spell 'Expecto Patronum' conjure?",
+    "answers": [
+      "A shield",
+      "A guardian animal",
+      "Fire",
+      "Water"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q24",
+    "question": "Which spell can repair broken objects?",
+    "answers": [
+      "Reparo",
+      "Reducto",
+      "Riddikulus",
+      "Relashio"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q25",
+    "question": "What magical creature can only be seen by those who have witnessed death?",
+    "answers": [
+      "Hippogriff",
+      "Thestral",
+      "Unicorn",
+      "Centaur"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q26",
+    "question": "In Hogwarts Legacy, what achievement requires you to 'Wield a Deathly Hallow'?",
+    "answers": [
+      "The Hallowed Hero",
+      "The Hero of Hogwarts",
+      "The Seeker of Knowledge",
+      "The Spell Master"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q27",
+    "question": "What's the name of the spell that creates water?",
+    "answers": [
+      "Incendio",
+      "Aguamenti",
+      "Anapneo",
+      "Diffindo"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q28",
+    "question": "In which house is Luna Lovegood?",
+    "answers": [
+      "Gryffindor",
+      "Hufflepuff",
+      "Ravenclaw",
+      "Slytherin"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q29",
+    "question": "Which magical plant is known for its screaming?",
+    "answers": [
+      "Devil's Snare",
+      "Gillyweed",
+      "Mandrake",
+      "Mimbulus Mimbletonia"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q30",
+    "question": "What does the 'Riddikulus' spell do?",
+    "answers": [
+      "Makes the target tell the truth",
+      "Transforms a Boggart into something funny",
+      "Creates riddles",
+      "Makes objects disappear"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q31",
+    "question": "What is the magical currency used in the wizarding world?",
+    "answers": [
+      "Dollars, Pounds, and Cents",
+      "Galleons, Sickles, and Knuts",
+      "Credits, Tokens, and Chips",
+      "Gold, Silver, and Bronze"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q32",
+    "question": "In 'Magic Awakened', what is a Magic Pass used for?",
+    "answers": [
+      "Accessing restricted areas",
+      "Unlocking in-game rewards and resources",
+      "Creating new spells",
+      "Skipping difficult levels"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "hard"
+  },
+  {
+    "id": "q33",
+    "question": "Who was the Potions Master at Hogwarts when Harry Potter attended?",
+    "answers": [
+      "Horace Slughorn",
+      "Severus Snape",
+      "Albus Dumbledore",
+      "Minerva McGonagall"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q34",
+    "question": "What is the incantation for the Levitation Charm?",
+    "answers": [
+      "Alohomora",
+      "Expecto Patronum",
+      "Wingardium Leviosa",
+      "Lumos"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q35",
+    "question": "Which of these is NOT an Unforgivable Curse?",
+    "answers": [
+      "Avada Kedavra",
+      "Crucio",
+      "Imperio",
+      "Sectumsempra"
+    ],
+    "correctAnswer": 3,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q36",
+    "question": "What magical item shows the Room of Requirement on it?",
+    "answers": [
+      "The Sorting Hat",
+      "The Marauder's Map",
+      "The Pensieve",
+      "The Mirror of Erised"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q37",
+    "question": "Which platform at King's Cross Station do students take to board the Hogwarts Express?",
+    "answers": [
+      "Platform 7 1/2",
+      "Platform 9 3/4",
+      "Platform 10 1/2",
+      "Platform 12"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q38",
+    "question": "In Hogwarts Legacy, what does the achievement 'Merlin's Beard!' require?",
+    "answers": [
+      "Growing a beard",
+      "Finding Merlin's portrait",
+      "Completing all Merlin Trials",
+      "Brewing a special potion"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q39",
+    "question": "What spell would you use to summon an object?",
+    "answers": [
+      "Wingardium Leviosa",
+      "Accio",
+      "Expecto Patronum",
+      "Alohomora"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q40",
+    "question": "Which of these is NOT a type of magical wand core mentioned by Ollivander?",
+    "answers": [
+      "Phoenix feather",
+      "Dragon heartstring",
+      "Unicorn hair",
+      "Troll whisker"
+    ],
+    "correctAnswer": 3,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q41",
+    "question": "What is the name of Hagrid's three-headed dog?",
+    "answers": [
+      "Fang",
+      "Fluffy",
+      "Norbert",
+      "Aragog"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q42",
+    "question": "In 'Harry Potter: Magic Awakened', what are students able to collect in the Forbidden Forest?",
+    "answers": [
+      "Gobstones",
+      "Echoes",
+      "Galleons",
+      "Relics"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "hard"
+  },
+  {
+    "id": "q43",
+    "question": "Which spell creates a temporary shield?",
+    "answers": [
+      "Expelliarmus",
+      "Protego",
+      "Impedimenta",
+      "Reducto"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q44",
+    "question": "What is the core subject NOT taught at Hogwarts?",
+    "answers": [
+      "Transfiguration",
+      "Potions",
+      "Mathematics",
+      "Charms"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q45",
+    "question": "What is the name of the Hogwarts caretaker in Harry Potter's time?",
+    "answers": [
+      "Argus Filch",
+      "Rubeus Hagrid",
+      "Mundungus Fletcher",
+      "Filius Flitwick"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q46",
+    "question": "In Hogwarts Legacy, what achievement requires you to 'Stun 10 different enemies using a Mandrake'?",
+    "answers": [
+      "The Root of the Problem",
+      "Put Down Roots",
+      "The Spell Master",
+      "Finishing Touches"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q47",
+    "question": "What creature guards the vaults at Gringotts Bank?",
+    "answers": [
+      "Goblins",
+      "Trolls",
+      "Dragons",
+      "All of the above"
+    ],
+    "correctAnswer": 3,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q48",
+    "question": "What is Harry Potter's Patronus?",
+    "answers": [
+      "Stag",
+      "Doe",
+      "Wolf",
+      "Otter"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q49",
+    "question": "Which school did Viktor Krum attend?",
+    "answers": [
+      "Beauxbatons",
+      "Durmstrang",
+      "Ilvermorny",
+      "Hogwarts"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q50",
+    "question": "What is the name of the Hogwarts school song?",
+    "answers": [
+      "Witches and Wizards",
+      "Hoggy Warty Hogwarts",
+      "The Sorting Hat's Song",
+      "School of Magic"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q51",
+    "question": "Which animal can Hermione transform into with her Time-Turner?",
+    "answers": [
+      "Cat",
+      "Owl",
+      "None, Time-Turners don't transform people",
+      "Otter"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q52",
+    "question": "On Pottermore, what was the special challenge called that allowed early access?",
+    "answers": [
+      "The Golden Snitch",
+      "The Magical Quill Challenge",
+      "The Sorting Hat Quiz",
+      "The Wand Selection"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "hard"
+  },
+  {
+    "id": "q53",
+    "question": "What color is the Hogwarts Express?",
+    "answers": [
+      "Blue",
+      "Green",
+      "Black",
+      "Red"
+    ],
+    "correctAnswer": 3,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q54",
+    "question": "What substance is in Skele-Gro potion?",
+    "answers": [
+      "Chinese Chomping Cabbage",
+      "Dragon blood",
+      "Mandrake root",
+      "Spine of lionfish"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "hard"
+  },
+  {
+    "id": "q55",
+    "question": "Who was NOT a member of the Order of the Phoenix?",
+    "answers": [
+      "Sirius Black",
+      "Remus Lupin",
+      "Severus Snape",
+      "Lucius Malfoy"
+    ],
+    "correctAnswer": 3,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q56",
+    "question": "In Hogwarts Legacy, what achievement requires you to 'Learn all spells'?",
+    "answers": [
+      "The Spell Master",
+      "The Seeker of Knowledge",
+      "The Hero of Hogwarts",
+      "The One Who Mastered Memories"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q57",
+    "question": "What spell would you use to extinguish light?",
+    "answers": [
+      "Lumos",
+      "Nox",
+      "Obscuro",
+      "Deluminate"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q58",
+    "question": "Which of these is NOT a Hogwarts house ghost?",
+    "answers": [
+      "Nearly Headless Nick",
+      "The Bloody Baron",
+      "The Grey Lady",
+      "Moaning Myrtle"
+    ],
+    "correctAnswer": 3,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q59",
+    "question": "What does the 'Obliviate' spell do?",
+    "answers": [
+      "Makes objects disappear",
+      "Erases memories",
+      "Creates illusions",
+      "Heals injuries"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q60",
+    "question": "What's the name of the wizarding prison?",
+    "answers": [
+      "Nurmengard",
+      "Durmstrang",
+      "Azkaban",
+      "Gringotts"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q61",
+    "question": "What creature is known to guard treasure and breathe fire?",
+    "answers": [
+      "Niffler",
+      "Troll",
+      "Dragon",
+      "Phoenix"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q62",
+    "question": "In 'Harry Potter: Magic Awakened', how many types of Solo Duelling are there?",
+    "answers": [
+      "One",
+      "Two",
+      "Three",
+      "Four"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "hard"
+  },
+  {
+    "id": "q63",
+    "question": "Which side of magic is Lord Voldemort associated with?",
+    "answers": [
+      "Light Magic",
+      "Dark Magic",
+      "Wild Magic",
+      "Ancient Magic"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q64",
+    "question": "In which subject would you learn to make potions?",
+    "answers": [
+      "Herbology",
+      "Alchemy",
+      "Potions",
+      "Chemistry"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q65",
+    "question": "What spell would you use to start a fire?",
+    "answers": [
+      "Incendio",
+      "Lumos",
+      "Flagrate",
+      "Lacarnum Inflamarae"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q66",
+    "question": "In Hogwarts Legacy, what achievement requires you to 'Beat Imelda's time in all broom races'?",
+    "answers": [
+      "Rising From the Ashes",
+      "Room with a View",
+      "Flight the Good Flight",
+      "Merlin's Beard!"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q67",
+    "question": "What is the name of the village where Harry Potter was born?",
+    "answers": [
+      "Little Whinging",
+      "Hogsmeade",
+      "Godric's Hollow",
+      "Ottery St. Catchpole"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q68",
+    "question": "What does the 'Lumos Maxima' spell do?",
+    "answers": [
+      "Creates a small light",
+      "Creates a very bright light",
+      "Extinguishes all light",
+      "Creates fireworks"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q69",
+    "question": "Which of these is NOT a type of broomstick?",
+    "answers": [
+      "Nimbus 2000",
+      "Firebolt",
+      "Cleansweep",
+      "Thunderbolt"
+    ],
+    "correctAnswer": 3,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q70",
+    "question": "What is the name of Harry Potter's cousin?",
+    "answers": [
+      "Dudley Dursley",
+      "Vernon Dursley",
+      "Petunia Dursley",
+      "Marge Dursley"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q71",
+    "question": "Which professor teaches Transfiguration at Hogwarts during Harry's time?",
+    "answers": [
+      "Severus Snape",
+      "Minerva McGonagall",
+      "Filius Flitwick",
+      "Pomona Sprout"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q72",
+    "question": "In 'Harry Potter: Magic Awakened', what type of dance is 'Magic Boogie'?",
+    "answers": [
+      "Waltz",
+      "Tango",
+      "Funk",
+      "Flamenco"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "hard"
+  },
+  {
+    "id": "q73",
+    "question": "What is the symbol of Hufflepuff house?",
+    "answers": [
+      "Lion",
+      "Snake",
+      "Eagle",
+      "Badger"
+    ],
+    "correctAnswer": 3,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q74",
+    "question": "What is the name of the ghost who haunts the girls' bathroom?",
+    "answers": [
+      "The Bloody Baron",
+      "The Grey Lady",
+      "Moaning Myrtle",
+      "Nearly Headless Nick"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q75",
+    "question": "What spell sends a jet of red light to stun an opponent?",
+    "answers": [
+      "Expelliarmus",
+      "Stupefy",
+      "Impedimenta",
+      "Petrificus Totalus"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q76",
+    "question": "In Hogwarts Legacy, what achievement requires you to 'Unlock all Floo Flames'?",
+    "answers": [
+      "Floo Around the World",
+      "The Intrepid Explorer",
+      "The Seeker of Knowledge",
+      "Flight the Good Flight"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q77",
+    "question": "What is the name of Hermione's cat?",
+    "answers": [
+      "Crookshanks",
+      "Scabbers",
+      "Trevor",
+      "Mrs. Norris"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q78",
+    "question": "What is the sport played on broomsticks?",
+    "answers": [
+      "Broom Racing",
+      "Quidditch",
+      "Wizard's Chess",
+      "Gobstones"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q79",
+    "question": "What creature is half-horse, half-human?",
+    "answers": [
+      "Hippogriff",
+      "Centaur",
+      "Thestral",
+      "Griffin"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q80",
+    "question": "What was the name of Lord Voldemort when he was a student?",
+    "answers": [
+      "Tom Riddle",
+      "Severus Snape",
+      "Gellert Grindelwald",
+      "Salazar Slytherin"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q81",
+    "question": "What is the primary power of a Phoenix?",
+    "answers": [
+      "Invisibility",
+      "Resurrection",
+      "Mind reading",
+      "Weather control"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q82",
+    "question": "On Pottermore, how many House Cups were awarded before the site was redesigned?",
+    "answers": [
+      "Three",
+      "Four",
+      "Five",
+      "Six"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "hard"
+  },
+  {
+    "id": "q83",
+    "question": "What is the spell that can turn an object into a Portkey?",
+    "answers": [
+      "Accio",
+      "Portus",
+      "Locomotor",
+      "Transportium"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "hard"
+  },
+  {
+    "id": "q84",
+    "question": "What is the effect of a Dementor's Kiss?",
+    "answers": [
+      "Death",
+      "Memory loss",
+      "Soul removal",
+      "Severe depression"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q85",
+    "question": "What does the 'Anapneo' spell do?",
+    "answers": [
+      "Causes sleep",
+      "Clears blocked airways",
+      "Creates water",
+      "Exposes lies"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "hard"
+  },
+  {
+    "id": "q86",
+    "question": "In Hogwarts Legacy, what achievement requires you to 'Reach a combo of 100'?",
+    "answers": [
+      "Raising Expectations",
+      "The Spell Master",
+      "The Intrepid Explorer",
+      "The Hero of Hogwarts"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q87",
+    "question": "What position did Harry Potter play in Quidditch?",
+    "answers": [
+      "Keeper",
+      "Chaser",
+      "Beater",
+      "Seeker"
+    ],
+    "correctAnswer": 3,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q88",
+    "question": "What spell would you use to create a Patronus?",
+    "answers": [
+      "Expelliarmus",
+      "Expecto Patronum",
+      "Riddikulus",
+      "Protego"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q89",
+    "question": "What is the wizarding wireless network called?",
+    "answers": [
+      "Magical Airwaves",
+      "Wizard Radio",
+      "Wizarding Wireless Network",
+      "Sonorus Broadcasting"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q90",
+    "question": "Who is the author of 'Fantastic Beasts and Where to Find Them'?",
+    "answers": [
+      "Bathilda Bagshot",
+      "Newt Scamander",
+      "Gilderoy Lockhart",
+      "Rita Skeeter"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q91",
+    "question": "What is the name of the Weasleys' house-elf?",
+    "answers": [
+      "Dobby",
+      "Kreacher",
+      "Winky",
+      "The Weasleys don't have a house-elf"
+    ],
+    "correctAnswer": 3,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q92",
+    "question": "In 'Harry Potter: Magic Awakened', what type of activity is the Dance Club focused on?",
+    "answers": [
+      "Dueling",
+      "Potion making",
+      "Dancing",
+      "Quidditch"
+    ],
+    "correctAnswer": 2,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q93",
+    "question": "What does Dumbledore claim to see in the Mirror of Erised?",
+    "answers": [
+      "His family alive and well",
+      "Himself holding a pair of thick woolen socks",
+      "The defeat of Voldemort",
+      "Hogwarts at peace"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q94",
+    "question": "What is the name of the Black family house-elf?",
+    "answers": [
+      "Dobby",
+      "Kreacher",
+      "Winky",
+      "Hokey"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q95",
+    "question": "What is the full name of the spell used to levitate objects?",
+    "answers": [
+      "Levitation Charm",
+      "Hovering Charm",
+      "Wingardium Leviosa",
+      "Floating Enchantment"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q96",
+    "question": "In Hogwarts Legacy, what achievement requires you to 'Use Flipendo ten times – to tip one cow or several'?",
+    "answers": [
+      "Spilled Milk",
+      "The Root of the Problem",
+      "The Spell Master",
+      "The Nature of the Beast"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q97",
+    "question": "What is the name of Hermione's organization to help house-elves?",
+    "answers": [
+      "House-Elf Liberation Front",
+      "Society for the Promotion of Elfish Welfare",
+      "Elf Rights Campaign",
+      "Magical Creatures Protection Society"
+    ],
+    "correctAnswer": 1,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q98",
+    "question": "Which of these is NOT a real spell in Harry Potter?",
+    "answers": [
+      "Episkey",
+      "Finite Incantatem",
+      "Revelio",
+      "Abracadabra"
+    ],
+    "correctAnswer": 3,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q99",
+    "question": "What is the name of the Malfoy family house-elf?",
+    "answers": [
+      "Dobby",
+      "Kreacher",
+      "Winky",
+      "Hokey"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "medium"
+  },
+  {
+    "id": "q100",
+    "question": "What is Hagrid's full name?",
+    "answers": [
+      "Rubeus Hagrid",
+      "Remus Hagrid",
+      "Rufus Hagrid",
+      "Ronald Hagrid"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "easy"
+  },
+  {
+    "id": "q101",
+    "question": "Which spell creates an invisible barrier?",
+    "answers": [
+      "Protego",
+      "Impedimenta",
+      "Expelliarmus",
+      "Salvio Hexia"
+    ],
+    "correctAnswer": 0,
+    "difficulty": "medium"
+  }
+]

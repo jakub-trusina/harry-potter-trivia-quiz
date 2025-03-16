@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harry Potter Territory Quiz</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Harry Potter Territory Quiz</h1>
+        </header>
+        
+        <div id="login-screen" class="screen">
+            <div class="wizard-card">
+                <h2>Enter the Wizarding World</h2>
+                <input type="text" id="player-name" placeholder="Enter your wizard name">
+                <button id="join-game-btn" class="hp-button">Join Game</button>
+            </div>
+        </div>
+        
+        <div id="lobby-screen" class="screen hidden">
+            <div class="wizard-card">
+                <h2>Wizards' Gathering</h2>
+                <div class="player-list-container">
+                    <h3>Players:</h3>
+                    <ul id="player-list"></ul>
+                </div>
+                <p class="waiting-text">Waiting for players (2-3 needed)</p>
+                <button id="start-game-btn" class="hp-button">Start Game</button>
+            </div>
+        </div>
+        
+        <div id="game-screen" class="screen hidden">
+            <div class="game-board">
+                <div class="map-legend hidden" id="map-legend">
+                    <button id="toggle-legend" class="hp-button">Show/Hide Legend</button>
+                    <div class="legend-content">
+                        <h3>Hogwarts Territories</h3>
+                        <ul>
+                            <li class="gryffindor">Gryffindor Territories</li>
+                            <li class="slytherin">Slytherin Territories</li>
+                            <li class="ravenclaw">Ravenclaw Territories</li>
+                            <li class="neutral">Unclaimed Territories</li>
+                            <li class="capital">Capital Territories</li>
+                            <li class="attackable">Attackable Territories</li>
+                        </ul>
+                    </div>
+                </div>
+                <div id="map-container"></div>
+                <div id="game-info">
+                    <div class="player-stats-container">
+                        <h3>Players</h3>
+                        <div id="player-stats"></div>
+                    </div>
+                    <div id="action-log">
+                        <h3>Action Log</h3>
+                        <div id="log-entries"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="quiz-modal" class="modal hidden">
+            <div class="modal-content wizard-card">
+                <h2>Wizard Duel!</h2>
+                <div id="duel-status" class="duel-status"></div>
+                <div id="question-container">
+                    <p id="question-text"></p>
+                    <div id="answers-container"></div>
+                </div>
+                <div id="timer">30</div>
+            </div>
+        </div>
+        
+        <div id="game-over-modal" class="modal hidden">
+            <div class="modal-content wizard-card">
+                <h2>Game Over!</h2>
+                <p id="winner-text"></p>
+                <button id="new-game-btn" class="hp-button">New Game</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html> 
