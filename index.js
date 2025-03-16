@@ -212,7 +212,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Fix duel-answer handler to properly handle duels and turn progression
+  // Fix duel-answer handler to properly manage territory ownership
   socket.on('duel-answer', (data) => {
     const { territoryId, answer, responseTime } = data;
     
@@ -352,16 +352,40 @@ io.on('connection', (socket) => {
       
       // Update territory ownership if attacker wins
       if (winnerId === duelData.attackerId) {
-        // Remove from previous owner if there was one
+        // Check if this was a capital
+        const wasCapital = gameState.territories[territoryId].isCapital;
+        let originalOwner = null;
+        
+        if (wasCapital) {
+          // Find the original owner
+          originalOwner = Object.keys(gameState.players).find(id => 
+            gameState.players[id].capital === territoryId
+          );
+        }
+        
+        // Remove from previous owner if there was one (CRITICAL - THIS WAS MISSING)
         if (duelData.defenderId) {
           gameState.players[duelData.defenderId].territories = 
             gameState.players[duelData.defenderId].territories.filter(id => id !== territoryId);
         }
         
-        // Add to attacker
+        // Update ownership in the territory object
         gameState.territories[territoryId].owner = duelData.attackerId;
+        
+        // Add to attacker's territory list
         if (!gameState.players[duelData.attackerId].territories.includes(territoryId)) {
           gameState.players[duelData.attackerId].territories.push(territoryId);
+        }
+        
+        // If it was a capital, handle capital capture properly
+        if (wasCapital) {
+          // Set isCapital to false since it's been captured
+          gameState.territories[territoryId].isCapital = false;
+          
+          // Log the capital capture
+          if (originalOwner && originalOwner !== duelData.attackerId) {
+            io.emit('game-log', `${gameState.players[duelData.attackerId].name} has captured ${gameState.players[originalOwner].name}'s capital!`);
+          }
         }
         
         // Check win condition
@@ -376,6 +400,8 @@ io.on('connection', (socket) => {
         reason: winReason,
         attackerId: duelData.attackerId,
         defenderId: duelData.defenderId,
+        attackerAnswer: attackerAnswer.answer,
+        defenderAnswer: duelData.defenderId ? duelData.answers[duelData.defenderId].answer : null,
         attackerCorrect,
         defenderCorrect: duelData.defenderId && 
                         duelData.answers[duelData.defenderId].answer === duelData.question.correctAnswer,
@@ -420,10 +446,22 @@ function getRandomQuestion() {
   return gameState.questions[randomIndex];
 }
 
-// Modified initializeGame function to distribute territories evenly
+// Update the initializeGame function to always use a 6x6 grid
 function initializeGame() {
-  const gridWidth = 8;
-  const gridHeight = 8;
+  console.log("=== GAME INITIALIZATION STARTED ===");
+  console.log("Players:", gameState.players);
+  
+  const playerIds = Object.keys(gameState.players);
+  const playerCount = playerIds.length;
+  
+  // Always use a 6x6 grid regardless of player count
+  const gridWidth = 6;
+  const gridHeight = 6;
+  
+  console.log(`Creating a ${gridWidth}x${gridHeight} game board for ${playerCount} players`);
+  
+  // Clear any existing territories
+  gameState.territories = {};
   
   // Create territories in a grid
   for (let x = 0; x < gridWidth; x++) {
@@ -436,204 +474,341 @@ function initializeGame() {
         x,
         y,
         value,
-        owner: null
+        owner: null,
+        isCapital: false  // Explicitly initialize as not a capital
       };
     }
   }
   
-  // Get list of all territories
-  const allTerritories = Object.keys(gameState.territories);
+  // Log the initial territories
+  console.log(`Created ${Object.keys(gameState.territories).length} territories`);
   
-  // Get all players
-  const playerIds = Object.keys(gameState.players);
-  const playerCount = playerIds.length;
+  // Place capitals based on player count
+  const capitalPositions = getCapitalPositions(playerCount, gridWidth, gridHeight);
+  console.log("Capital positions:", capitalPositions);
   
-  // Calculate territories per player - divide evenly
-  const totalTerritories = allTerritories.length;
-  const territoriesPerPlayer = Math.floor(totalTerritories / playerCount);
+  // Assign capitals to players
+  playerIds.forEach((playerId, index) => {
+    if (index < capitalPositions.length) {
+      const position = capitalPositions[index];
+      const territoryId = `t-${position.x}-${position.y}`;
+      
+      // Check if territory exists
+      if (!gameState.territories[territoryId]) {
+        console.error(`ERROR: Territory ${territoryId} not found for capital assignment!`);
+        return;
+      }
+      
+      // Set as capital
+      gameState.territories[territoryId].owner = playerId;
+      gameState.territories[territoryId].isCapital = true;
+      gameState.players[playerId].capital = territoryId;
+      gameState.players[playerId].territories = [territoryId];
+      
+      console.log(`Player ${gameState.players[playerId].name} capital at (${position.x},${position.y})`);
+    }
+  });
   
-  // Assign territories as evenly as possible
-  playerIds.forEach((playerId, playerIndex) => {
-    // Determine how many territories this player gets
-    let playerTerritoryCount = territoriesPerPlayer;
-    
-    // If there are leftover territories, distribute them
-    if (playerIndex < totalTerritories % playerCount) {
-      playerTerritoryCount++;
+  // Calculate territories per player (excluding capitals)
+  const totalTerritories = gridWidth * gridHeight;
+  const remainingTerritories = totalTerritories - playerCount;
+  const territoriesPerPlayer = Math.floor(remainingTerritories / playerCount);
+  
+  console.log(`Each player will get approximately ${territoriesPerPlayer} additional territories`);
+  
+  // Assign additional territories around each capital
+  playerIds.forEach((playerId, index) => {
+    const capitalId = gameState.players[playerId].capital;
+    if (!capitalId) {
+      console.error(`ERROR: No capital found for player ${playerId}`);
+      return;
     }
     
-    // Find a starting point for this player's territory cluster
-    const startX = Math.floor((gridWidth / playerCount) * playerIndex + (gridWidth / playerCount / 2));
-    const startY = Math.floor(gridHeight / 2);
-    const startId = `t-${startX}-${startY}`;
+    const capital = gameState.territories[capitalId];
+    if (!capital) {
+      console.error(`ERROR: Territory not found for capital ID ${capitalId}`);
+      return;
+    }
     
-    // Start with the closest territory to the calculated starting point
-    let startingTerritory = findClosestTerritory(startX, startY, allTerritories, gameState.territories);
+    // How many additional territories this player gets
+    let additionalCount = territoriesPerPlayer;
     
-    // Assign it as a capital
-    gameState.territories[startingTerritory].owner = playerId;
-    gameState.territories[startingTerritory].isCapital = true;
-    gameState.players[playerId].capital = startingTerritory;
-    gameState.players[playerId].territories = [startingTerritory];
+    // Distribute any remainder to early players
+    if (index < remainingTerritories % playerCount) {
+      additionalCount++;
+    }
     
-    // Exclude this territory from further assignment
-    const usedTerritories = new Set([startingTerritory]);
+    console.log(`Assigning ${additionalCount} additional territories to ${gameState.players[playerId].name}`);
     
-    // Assign remaining territories using BFS
-    assignAdjacentTerritories(playerId, startingTerritory, playerTerritoryCount - 1, usedTerritories);
+    // Set of territories already assigned
+    const assignedTerritories = new Set(playerIds.map(id => gameState.players[id].capital));
+    
+    // Assign territories using proximity from capital
+    assignTerritoriesToPlayer(playerId, capital, additionalCount, assignedTerritories);
   });
   
   // Set first player's turn
   gameState.currentTurn = playerIds[0];
   
-  console.log("Game initialized with even territory distribution");
+  console.log("=== GAME INITIALIZATION COMPLETE ===");
+  console.log("Final territory state:", gameState.territories);
+  console.log("Final player state:", gameState.players);
+  
+  // Send territory update to clients
+  io.emit('territory-update', gameState.territories);
+  io.emit('player-list-update', Object.values(gameState.players));
+  io.emit('turn-update', gameState.currentTurn);
 }
 
-// Helper function to find closest territory to a point
-function findClosestTerritory(x, y, availableTerritories, territoriesData) {
-  let closestId = availableTerritories[0];
-  let minDistance = Infinity;
+// Helper function to determine capital positions based on player count
+function getCapitalPositions(playerCount, gridWidth, gridHeight) {
+  const positions = [];
   
-  availableTerritories.forEach(id => {
-    if (territoriesData[id].owner === null) {
-      const territory = territoriesData[id];
-      const distance = Math.sqrt(Math.pow(territory.x - x, 2) + Math.pow(territory.y - y, 2));
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestId = id;
+  if (playerCount === 2) {
+    // 2 players: opposite diagonal corners
+    positions.push({x: 0, y: 0});
+    positions.push({x: gridWidth-1, y: gridHeight-1});
+  } 
+  else if (playerCount === 3) {
+    // 3 players: two neighboring corners and one in the middle of opposite side
+    positions.push({x: 0, y: 0});                   // Top-left corner
+    positions.push({x: 0, y: gridHeight-1});        // Bottom-left corner
+    positions.push({x: gridWidth-1, y: Math.floor(gridHeight/2)}); // Middle of right side
+  } 
+  else if (playerCount === 4) {
+    // 4 players: each in a corner
+    positions.push({x: 0, y: 0});                   // Top-left
+    positions.push({x: gridWidth-1, y: 0});         // Top-right
+    positions.push({x: 0, y: gridHeight-1});        // Bottom-left
+    positions.push({x: gridWidth-1, y: gridHeight-1}); // Bottom-right
+  }
+  else {
+    // Fallback for other player counts (shouldn't happen)
+    for (let i = 0; i < playerCount; i++) {
+      positions.push({
+        x: Math.floor(i * gridWidth / playerCount),
+        y: Math.floor(i * gridHeight / playerCount)
+      });
+    }
+  }
+  
+  return positions;
+}
+
+// Helper function to assign territories to a player using BFS
+function assignTerritoriesToPlayer(playerId, startTerritory, count, assignedTerritories) {
+  if (count <= 0) return;
+  
+  // Use a priority queue approach to prefer territories closer to the capital
+  // We'll simulate this with an array and sort by distance
+  const candidates = [];
+  const startX = startTerritory.x;
+  const startY = startTerritory.y;
+  
+  // Find all valid territory candidates and sort by distance to capital (prioritize clustering)
+  Object.values(gameState.territories).forEach(territory => {
+    // Skip already assigned territories
+    if (territory.owner !== null || assignedTerritories.has(territory.id)) {
+      return;
+    }
+    
+    // Calculate Manhattan distance to capital
+    const distanceToCapital = Math.abs(territory.x - startX) + Math.abs(territory.y - startY);
+    
+    candidates.push({
+      id: territory.id,
+      x: territory.x,
+      y: territory.y,
+      distance: distanceToCapital
+    });
+  });
+  
+  // Sort by distance (closest first)
+  candidates.sort((a, b) => a.distance - b.distance);
+  
+  // Take the closest territories up to the count
+  const territoriesToAssign = candidates.slice(0, count);
+  
+  // Assign territories to the player
+  territoriesToAssign.forEach(candidate => {
+    const territoryId = candidate.id;
+    
+    // Assign to player
+    gameState.territories[territoryId].owner = playerId;
+    gameState.players[playerId].territories.push(territoryId);
+    
+    // Mark as assigned
+    assignedTerritories.add(territoryId);
+  });
+  
+  console.log(`Assigned ${territoriesToAssign.length} territories to player ${playerId} near (${startX}, ${startY})`);
+}
+
+// Update the checkWinCondition function to handle player elimination
+function checkWinCondition() {
+  const playerIds = Object.keys(gameState.players);
+  
+  // Check if any player has lost their capital
+  playerIds.forEach(playerId => {
+    const player = gameState.players[playerId];
+    const capital = player.capital;
+    
+    // Skip players who have already been marked as eliminated
+    if (player.eliminated) return;
+    
+    // Check if this player's capital is owned by someone else
+    if (gameState.territories[capital] && gameState.territories[capital].owner !== playerId) {
+      // Player has lost their capital - mark as eliminated
+      player.eliminated = true;
+      
+      // Capture message
+      const capturingPlayerId = gameState.territories[capital].owner;
+      const capturingPlayerName = gameState.players[capturingPlayerId].name || 'Unknown';
+      
+      // Announce elimination
+      io.emit('player-eliminated', {
+        playerId: playerId,
+        playerName: player.name,
+        eliminatedBy: capturingPlayerName
+      });
+      
+      io.emit('game-log', `${player.name}'s capital has been captured by ${capturingPlayerName}!`);
+      
+      // Convert their territories to neutral (except the capital which stays with the capturer)
+      convertTerritoriesToNeutral(playerId, capital);
+    }
+  });
+  
+  // Check if only one player remains (final win condition)
+  const activePlayers = playerIds.filter(id => !gameState.players[id].eliminated);
+  
+  if (activePlayers.length === 1) {
+    const winner = gameState.players[activePlayers[0]];
+    io.emit('game-over', {
+      winner: winner,
+      reason: 'Last wizard standing!'
+    });
+  }
+}
+
+// Update the convertTerritoriesToNeutral function to handle capital styling
+function convertTerritoriesToNeutral(playerId, exceptTerritoryId) {
+  console.log(`Converting ${playerId}'s territories to neutral (except ${exceptTerritoryId})`);
+  
+  // Go through all territories
+  Object.values(gameState.territories).forEach(territory => {
+    // If owned by the eliminated player and not the excepted territory
+    if (territory.owner === playerId && territory.id !== exceptTerritoryId) {
+      // Convert to neutral
+      territory.owner = null;
+      
+      // If it was a capital, it's no longer a capital
+      if (territory.isCapital) {
+        territory.isCapital = false;
       }
     }
   });
   
-  return closestId;
-}
-
-// Helper function to assign adjacent territories using BFS
-function assignAdjacentTerritories(playerId, startId, count, usedTerritories) {
-  if (count <= 0) return;
-  
-  const queue = [startId];
-  const directions = [
-    {dx: -1, dy: 0}, {dx: 1, dy: 0}, 
-    {dx: 0, dy: -1}, {dx: 0, dy: 1},
-    {dx: -1, dy: -1}, {dx: 1, dy: 1},
-    {dx: -1, dy: 1}, {dx: 1, dy: -1}
-  ];
-  
-  while (queue.length > 0 && count > 0) {
-    const currentId = queue.shift();
-    const current = gameState.territories[currentId];
-    
-    // Use a regular for loop instead of forEach to allow breaking
-    for (let i = 0; i < directions.length; i++) {
-      if (count <= 0) break; // Now this break is legal
-      
-      const dir = directions[i];
-      const newX = current.x + dir.dx;
-      const newY = current.y + dir.dy;
-      
-      // Check if coordinates are valid
-      if (newX >= 0 && newX < 8 && newY >= 0 && newY < 8) {
-        const newId = `t-${newX}-${newY}`;
-        
-        // If territory hasn't been assigned yet
-        if (!usedTerritories.has(newId) && !gameState.territories[newId].owner) {
-          // Assign to player
-          gameState.territories[newId].owner = playerId;
-          gameState.players[playerId].territories.push(newId);
-          
-          // Mark as used
-          usedTerritories.add(newId);
-          queue.push(newId);
-          
-          // Decrement counter
-          count--;
-        }
-      }
-    }
+  // The capital that was captured should no longer be a capital for the defeated player
+  // but remains owned by the capturing player
+  const capturedCapital = gameState.territories[exceptTerritoryId];
+  if (capturedCapital) {
+    capturedCapital.isCapital = false;
+    console.log(`Removing capital status from captured territory ${exceptTerritoryId}`);
   }
-}
-
-// Check if someone has won the game
-function checkWinCondition() {
-  const playerIds = Object.keys(gameState.players);
   
-  // Check if any player has captured all capitals
-  for (const playerId of playerIds) {
-    const player = gameState.players[playerId];
-    const capturedAllCapitals = playerIds.every(id => {
-      return id === playerId || player.territories.includes(gameState.players[id].capital);
-    });
-    
-    if (capturedAllCapitals) {
-      io.emit('game-over', {
-        winner: player,
-        reason: 'All capitals captured'
-      });
-      return;
-    }
-  }
+  // Update the player's territory list to be empty
+  gameState.players[playerId].territories = [];
+  
+  // Send territory update to all clients
+  io.emit('territory-update', gameState.territories);
 }
 
-// Add a function to advance to the next player's turn
+// Update the advanceToNextTurn function to properly handle eliminated players
 function advanceToNextTurn() {
-  const playerIds = Object.keys(gameState.players);
-  if (playerIds.length === 0) return;
-  
-  // Get current player index
-  const currentIndex = playerIds.indexOf(gameState.currentTurn);
-  
-  // Find next player that has territories
-  let nextIndex = currentIndex;
-  let playerFound = false;
-  
-  // Check up to one full cycle of players
-  for (let i = 0; i < playerIds.length; i++) {
-    // Move to next player (with wraparound)
-    nextIndex = (nextIndex + 1) % playerIds.length;
-    const nextPlayerId = playerIds[nextIndex];
+    const playerIds = Object.keys(gameState.players);
+    if (playerIds.length === 0) return;
     
-    // Check if player has territories or a capital
-    const hasTerritory = Object.values(gameState.territories).some(t => t.owner === nextPlayerId);
+    console.log("Advancing turn...");
+    console.log("Current players:", playerIds.map(id => `${id}: ${gameState.players[id].name} (${gameState.players[id].eliminated ? 'eliminated' : 'active'})`));
     
-    if (hasTerritory) {
-      playerFound = true;
-      break;
-    } else {
-      // If player has no territories, mark them as eliminated
-      if (!gameState.players[nextPlayerId].eliminated) {
-        gameState.players[nextPlayerId].eliminated = true;
-        io.emit('player-eliminated', {
-          playerId: nextPlayerId,
-          playerName: gameState.players[nextPlayerId].name
-        });
-        io.emit('game-log', `${gameState.players[nextPlayerId].name} has been eliminated from the game!`);
-      }
+    // Get current player index
+    const currentIndex = playerIds.indexOf(gameState.currentTurn);
+    console.log(`Current turn: ${gameState.currentTurn} (index ${currentIndex})`);
+    
+    // Track if we've gone through a full cycle without finding a valid player
+    let checkedCount = 0;
+    let nextIndex = currentIndex;
+    
+    // Keep looking until we find a non-eliminated player with territories, or we've checked everyone
+    while (checkedCount < playerIds.length) {
+        // Move to next player (with wraparound)
+        nextIndex = (nextIndex + 1) % playerIds.length;
+        const nextPlayerId = playerIds[nextIndex];
+        
+        console.log(`Checking player ${nextPlayerId} (${gameState.players[nextPlayerId].name})`);
+        
+        // Skip already eliminated players
+        if (gameState.players[nextPlayerId].eliminated) {
+            console.log(`Player ${nextPlayerId} is already eliminated, skipping`);
+            checkedCount++;
+            continue;
+        }
+        
+        // Check if player has territories
+        const hasTerritory = Object.values(gameState.territories).some(t => t.owner === nextPlayerId);
+        
+        if (hasTerritory) {
+            // Found a valid player
+            gameState.currentTurn = nextPlayerId;
+            const nextPlayerName = gameState.players[gameState.currentTurn].name;
+            console.log(`Turn advanced to player: ${nextPlayerName}`);
+            
+            io.emit('turn-update', gameState.currentTurn);
+            return;
+        } else {
+            // Player has no territories, mark them as eliminated
+            gameState.players[nextPlayerId].eliminated = true;
+            io.emit('player-eliminated', {
+                playerId: nextPlayerId,
+                playerName: gameState.players[nextPlayerId].name
+            });
+            io.emit('game-log', `${gameState.players[nextPlayerId].name} has been eliminated from the game!`);
+            
+            console.log(`Player ${nextPlayerId} has no territories, marking as eliminated`);
+        }
+        
+        checkedCount++;
     }
-  }
-  
-  // If all players are eliminated except one, that player wins
-  const remainingPlayers = playerIds.filter(id => 
-    !gameState.players[id].eliminated && 
-    Object.values(gameState.territories).some(t => t.owner === id)
-  );
-  
-  if (remainingPlayers.length === 1) {
-    io.emit('game-over', {
-      winner: gameState.players[remainingPlayers[0]],
-      reason: 'Last wizard standing!'
-    });
-    return;
-  }
-  
-  // Set the turn to the next player with territories
-  if (playerFound) {
-    gameState.currentTurn = playerIds[nextIndex];
-    const nextPlayerName = gameState.players[gameState.currentTurn].name;
-    console.log(`Turn advanced to player: ${nextPlayerName}`);
-  }
-  
-  io.emit('turn-update', gameState.currentTurn);
+    
+    // If we get here, all players are eliminated or have no territories
+    console.log("No valid players found to advance turn to");
+    
+    // Check if there's a winner (one player with territories)
+    const remainingPlayers = playerIds.filter(id => 
+        !gameState.players[id].eliminated && 
+        Object.values(gameState.territories).some(t => t.owner === id)
+    );
+    
+    if (remainingPlayers.length === 1) {
+        io.emit('game-over', {
+            winner: gameState.players[remainingPlayers[0]],
+            reason: 'Last wizard standing!'
+        });
+        console.log(`Game over! Winner: ${gameState.players[remainingPlayers[0]].name}`);
+    } else if (remainingPlayers.length === 0) {
+        // Edge case: No one has territories
+        io.emit('game-over', {
+            winner: null,
+            reason: 'No wizards remain!'
+        });
+        console.log("Game over! No players with territories remain");
+    } else {
+        // This shouldn't happen but just in case - pick the first remaining player
+        gameState.currentTurn = remainingPlayers[0];
+        console.log(`ABNORMAL TURN ADVANCE: Setting turn to ${gameState.players[gameState.currentTurn].name}`);
+        io.emit('turn-update', gameState.currentTurn);
+    }
 }
 
 // Start the server

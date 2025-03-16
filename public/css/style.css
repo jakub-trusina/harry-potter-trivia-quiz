@@ -199,45 +199,76 @@ input[type="text"] {
     display: none !important;
 }
 
-/* Make territories clean rectangles */
+/* Territory base styling */
 .territory {
     position: absolute;
-    background-color: rgba(211, 166, 37, 0.5);
-    border: 2px solid white;
+    background-color: rgba(245, 245, 220, 0.6); /* Light parchment with transparency */
+    border: 1px solid #666;
+    box-sizing: border-box;
     display: flex;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
     cursor: pointer;
-    transition: all 0.3s ease;
-    z-index: 5;
-    overflow: visible;
-    border-radius: 4px;
-    font-size: 1rem;
+    transition: all 0.2s ease;
+    z-index: 1;
 }
 
-/* House-specific colors */
+/* Clear house-specific classes with softer, more transparent colors */
 .territory.gryffindor {
-    background-color: rgba(116, 0, 1, 0.6);
+    background-color: rgba(174, 0, 1, 0.5) !important; /* Softer red with more transparency */
+    border: 2px solid rgba(208, 33, 31, 0.6) !important;
 }
 
 .territory.slytherin {
-    background-color: rgba(26, 71, 42, 0.6);
+    background-color: rgba(26, 98, 42, 0.5) !important; /* Softer green with more transparency */
+    border: 2px solid rgba(26, 130, 50, 0.6) !important;
 }
 
 .territory.ravenclaw {
-    background-color: rgba(14, 26, 64, 0.6);
+    background-color: rgba(14, 26, 115, 0.5) !important; /* Softer blue with more transparency */
+    border: 2px solid rgba(34, 47, 155, 0.6) !important;
+}
+
+.territory.hufflepuff {
+    background-color: rgba(255, 195, 0, 0.5) !important; /* Softer yellow with more transparency */
+    border: 2px solid rgba(255, 183, 0, 0.6) !important;
+}
+
+/* Ensure capital styling is distinctive */
+.territory.capital {
+    border: 4px solid gold !important;
+    box-shadow: 0 0 15px gold !important;
+    z-index: 10 !important; /* Ensure capitals are on top */
+}
+
+/* Ensure attackable territories have a visible indicator */
+.territory.attackable {
+    border: 3px dashed white !important;
+    animation: pulse 1.5s infinite;
+}
+
+/* Make the value more visible against any background */
+.territory-value {
+    font-weight: bold;
+    font-size: 1.2rem;
+    color: white !important;
+    text-shadow: 2px 2px 3px black, -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black, 1px 1px 0 black !important;
+}
+
+/* Player territory coloring */
+.player-territory {
+    border: 2px solid #333;
+}
+
+.player-territory.capital-territory {
+    z-index: 2; /* Make capitals appear above regular territories */
 }
 
 /* Capitals */
 .territory.capital {
-    border: 4px solid gold;
-    box-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
-}
-
-/* Attackable territories */
-.territory.attackable {
-    border: 3px dashed gold;
-    animation: pulse 1.5s infinite;
+    border: 3px solid gold !important;
+    box-shadow: 0 0 10px gold;
+    z-index: 2;
 }
 
 /* Tooltip styling */
@@ -266,17 +297,6 @@ input[type="text"] {
     transform: scale(1.05);
     box-shadow: 0 0 10px gold;
     z-index: 100;
-}
-
-/* Make territory values more visible */
-.territory-value {
-    font-weight: bold;
-    font-size: 1.5rem;
-    color: white;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 1);
-    pointer-events: none;
-    z-index: 10;
-    position: relative;
 }
 
 /* Add pulsing effect to show values are updating */
@@ -850,4 +870,158 @@ input[type="text"] {
     0% { box-shadow: 0 0 0 0 rgba(0, 128, 0, 0.7); }
     70% { box-shadow: 0 0 0 10px rgba(0, 128, 0, 0); }
     100% { box-shadow: 0 0 0 0 rgba(0, 128, 0, 0); }
+}
+
+/* Reading question animation */
+.reading-message {
+    font-style: italic;
+    color: var(--gryffindor-red);
+    padding: 10px;
+    border: 1px dashed var(--gryffindor-gold);
+    border-radius: 5px;
+    margin: 10px 0;
+    animation: pulse 1.5s infinite;
+}
+
+/* Answer reveal animation */
+.answer-reveal-animation {
+    animation: fadeIn 0.5s ease-out;
+    transition: all 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Player answer highlighting */
+.attacker-answer {
+    border-left: 5px solid var(--gryffindor-red) !important;
+    position: relative;
+}
+
+.defender-answer {
+    border-left: 5px solid var(--slytherin-green) !important;
+    position: relative;
+}
+
+.attacker-answer::after {
+    content: 'Your answer';
+    position: absolute;
+    top: -10px;
+    left: 10px;
+    background-color: var(--gryffindor-red);
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-weight: bold;
+}
+
+.defender-answer::after {
+    content: 'Your answer';
+    position: absolute;
+    top: -10px;
+    left: 10px;
+    background-color: var(--slytherin-green);
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-weight: bold;
+}
+
+/* Enhanced duel result display */
+.duel-result-summary {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 5px;
+    border-left: 4px solid var(--gryffindor-gold);
+    animation: slideIn 0.5s ease-out;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.player-result {
+    margin: 10px 0;
+    padding: 8px;
+    border-radius: 5px;
+}
+
+.player-result.attacker {
+    border-left: 3px solid var(--gryffindor-red);
+}
+
+.player-result.defender {
+    border-left: 3px solid var(--slytherin-green);
+}
+
+.player-result.correct {
+    background-color: rgba(0, 128, 0, 0.1);
+}
+
+.player-result.incorrect {
+    background-color: rgba(255, 0, 0, 0.1);
+}
+
+.answer-status {
+    font-weight: bold;
+    padding: 2px 5px;
+    border-radius: 3px;
+    margin: 0 5px;
+}
+
+.player-result.correct .answer-status {
+    background-color: green;
+    color: white;
+}
+
+.player-result.incorrect .answer-status {
+    background-color: #d9534f;
+    color: white;
+}
+
+.response-time {
+    background-color: rgba(0, 0, 0, 0.1);
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+.result-winner {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: var(--gryffindor-gold);
+    color: var(--ink);
+    border-radius: 5px;
+    text-align: center;
+    animation: pulse 1s infinite;
+}
+
+.result-reason {
+    font-style: italic;
+    margin-bottom: 10px;
+}
+
+/* Territory label styling */
+.territory-label {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    font-size: 0.8rem;
+    font-weight: bold;
+    padding: 2px 5px;
+    border-radius: 3px;
+}
+
+/* Add an additional class for defeated player's territories */
+.territory.defeated {
+    background-color: rgba(100, 100, 100, 0.4) !important; /* Grayed out */
+    border: 1px dashed rgba(100, 100, 100, 0.6) !important;
 } 

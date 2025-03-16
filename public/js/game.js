@@ -193,20 +193,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        // Add details about correctness and speed
+        // Format the response times as seconds with 2 decimal places
+        const attackerTimeFormatted = formatResponseTime(result.attackerTime);
+        const defenderTimeFormatted = result.defenderTime ? formatResponseTime(result.defenderTime) : null;
+        
+        // Add details about correctness and speed with formatted times
         if (result.attackerCorrect && result.defenderCorrect) {
             message += `Both answered correctly. `;
-            message += `${attackerName}: ${result.attackerTime}ms, ${defenderName}: ${result.defenderTime}ms. `;
+            message += `${attackerName}: ${attackerTimeFormatted}, ${defenderName}: ${defenderTimeFormatted}. `;
             message += `${result.winner === 'attacker' ? attackerName : defenderName} was faster!`;
         } else {
             if (result.attackerCorrect) {
-                message += `${attackerName} answered correctly in ${result.attackerTime}ms. `;
+                message += `${attackerName} answered correctly in ${attackerTimeFormatted}. `;
             } else {
                 message += `${attackerName} answered incorrectly. `;
             }
             
             if (result.defenderCorrect) {
-                message += `${defenderName} answered correctly in ${result.defenderTime}ms. `;
+                message += `${defenderName} answered correctly in ${defenderTimeFormatted}. `;
             } else if (result.defenderId) {
                 message += `${defenderName} answered incorrectly. `;
             }
@@ -214,33 +218,78 @@ document.addEventListener('DOMContentLoaded', () => {
         
         addLogEntry(message);
         
-        // NEW: Update the quiz modal with the results if it's still open
+        // Update the quiz modal with the results if it's still open
         const duelStatusEl = document.getElementById('duel-status');
         
         if (duelStatusEl && !quizModal.classList.contains('hidden')) {
-            // Update the modal with the results
-            duelStatusEl.innerHTML += `
-                <div class="duel-result-summary">
-                    <h3>Duel Complete!</h3>
-                    <p>${result.reason}</p>
-                    <p class="correct-answer">Correct answer: ${result.answerText}</p>
+            // Clear any previous result elements
+            const previousResults = duelStatusEl.querySelector('.duel-result-summary');
+            if (previousResults) {
+                previousResults.remove();
+            }
+            
+            // Create animated result display with formatted times
+            const resultSummary = document.createElement('div');
+            resultSummary.classList.add('duel-result-summary');
+            resultSummary.innerHTML = `
+                <h3>Duel Complete!</h3>
+                <p class="result-reason">${result.reason}</p>
+                <div class="result-detail">
+                    <div class="player-result attacker ${result.attackerCorrect ? 'correct' : 'incorrect'}">
+                        <strong>${attackerName} (Attacker)</strong>: 
+                        <span class="answer-status">${result.attackerCorrect ? 'Correct' : 'Incorrect'}</span>
+                        <span class="response-time">${attackerTimeFormatted}</span>
+                    </div>
+                    ${result.defenderId ? `
+                    <div class="player-result defender ${result.defenderCorrect ? 'correct' : 'incorrect'}">
+                        <strong>${defenderName} (Defender)</strong>: 
+                        <span class="answer-status">${result.defenderCorrect ? 'Correct' : 'Incorrect'}</span>
+                        <span class="response-time">${defenderTimeFormatted}</span>
+                    </div>` : ''}
+                </div>
+                <p class="correct-answer">Correct answer: ${result.answerText}</p>
+                <div class="result-winner">
+                    <strong>Winner: ${result.winner === 'attacker' ? attackerName : 
+                                  result.winner === 'defender' ? defenderName : 'None'}</strong>
                 </div>
             `;
             
-            // Highlight the correct answer button
+            duelStatusEl.appendChild(resultSummary);
+            
+            // Now we highlight the correct answer AFTER players have responded
             const answerButtons = answersContainer.querySelectorAll('.answer-btn');
             answerButtons.forEach((btn, index) => {
+                // Clear previous classes
+                btn.classList.remove('correct-answer-btn', 'incorrect-answer-btn', 'attacker-answer', 'defender-answer');
+                
+                // Mark correct answer
                 if (index === result.correctAnswer) {
                     btn.classList.add('correct-answer-btn');
+                    
+                    // Add correct answer label (only now, after responses)
+                    const revealLabel = document.createElement('div');
+                    revealLabel.classList.add('answer-reveal-label');
+                    revealLabel.textContent = 'Correct Answer';
+                    btn.appendChild(revealLabel);
                 } else {
                     btn.classList.add('incorrect-answer-btn');
                 }
+                
+                // Mark attacker's answer if this is that button
+                if (result.attackerId === playerId && btn.dataset.index == result.attackerAnswer) {
+                    btn.classList.add('attacker-answer');
+                }
+                
+                // Mark defender's answer if this is that button
+                if (result.defenderId === playerId && btn.dataset.index == result.defenderAnswer) {
+                    btn.classList.add('defender-answer');
+                }
             });
             
-            // Close the modal after 2 seconds
+            // Close the modal after 5 seconds
             setTimeout(() => {
                 hideQuizModal();
-            }, 2000);
+            }, 5000);
         }
         
         // Update the map
@@ -251,8 +300,8 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('duel-status-update', (data) => {
         const isCurrentPlayer = data.playerId === playerId;
         const message = isCurrentPlayer ? 
-                       `You answered in ${data.responseTime}ms. Waiting for opponent...` :
-                       `${data.playerName} (${data.role}) answered in ${data.responseTime}ms`;
+                       `You answered in ${formatResponseTime(data.responseTime)}s. Waiting for opponent...` :
+                       `${data.playerName} (${data.role}) answered in ${formatResponseTime(data.responseTime)}s`;
         
         addLogEntry(message);
         
@@ -340,20 +389,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function createMap() {
+        console.log("Creating map with territories:", territoryData);
+        
+        // Verify data before proceeding
+        if (!verifyTerritoryData()) return;
+        
         mapContainer.innerHTML = '';
         
-        // Get all territory data
         const territories = Object.values(territoryData);
+        if (territories.length === 0) {
+            console.error("No territories found!");
+            return;
+        }
         
-        // Find the grid dimensions
+        // Find grid dimensions
         const maxX = Math.max(...territories.map(t => t.x)) + 1;
         const maxY = Math.max(...territories.map(t => t.y)) + 1;
         
-        // Calculate cell dimensions
-        const cellWidth = mapContainer.clientWidth / maxX;
-        const cellHeight = mapContainer.clientHeight / maxY;
+        // Set board dimensions
+        mapContainer.style.gridTemplateColumns = `repeat(${maxX}, 1fr)`;
+        mapContainer.style.gridTemplateRows = `repeat(${maxY}, 1fr)`;
         
-        // Create all territories as simple rectangles
+        // Calculate cell size based on board dimensions
+        const boardWidth = mapContainer.clientWidth;
+        const boardHeight = mapContainer.clientHeight;
+        const cellWidth = boardWidth / maxX;
+        const cellHeight = boardHeight / maxY;
+        
+        // Create each territory
         territories.forEach(territory => {
             const territoryElement = document.createElement('div');
             territoryElement.classList.add('territory');
@@ -365,73 +428,143 @@ document.addEventListener('DOMContentLoaded', () => {
             territoryElement.style.left = `${territory.x * cellWidth}px`;
             territoryElement.style.top = `${territory.y * cellHeight}px`;
             
-            // Mark capitals
-            if (territory.isCapital) {
-                territoryElement.classList.add('capital');
-            }
-            
-            // Set value indicator - ensure it's visible and has proper value
+            // Add value indicator
             const valueElement = document.createElement('span');
             valueElement.classList.add('territory-value');
-            valueElement.textContent = territory.value || '?'; // Fallback if no value
-            valueElement.style.color = 'white'; // Ensure good visibility
-            valueElement.style.fontWeight = 'bold';
-            valueElement.style.textShadow = '2px 2px 4px black'; // Better readability
+            valueElement.textContent = territory.value || '1';
             territoryElement.appendChild(valueElement);
             
-            // Add tooltip
-            const locationNames = [
-                "Great Hall", "Gryffindor Tower", "Slytherin Dungeon", 
-                "Hufflepuff Basement", "Ravenclaw Tower", "Forbidden Forest", 
-                "Quidditch Pitch", "Astronomy Tower", "Hagrid's Hut",
-                "Room of Requirement", "Chamber of Secrets", "Whomping Willow",
-                "Owlery", "Black Lake", "Hogsmeade Village", "Shrieking Shack",
-                "Potions Classroom", "Defense Against Dark Arts", "Divination Tower",
-                "Transfiguration Courtyard", "Hogwarts Kitchen", "Library",
-                "Headmaster's Office", "Hospital Wing", "Greenhouse"
-            ];
-            
-            const nameIndex = (territory.x + territory.y * maxX) % locationNames.length;
-            
-            const tooltip = document.createElement('div');
-            tooltip.classList.add('territory-tooltip');
-            tooltip.textContent = locationNames[nameIndex];
-            territoryElement.appendChild(tooltip);
-            
-            // Add to the map
+            // Add to board
             mapContainer.appendChild(territoryElement);
         });
+        
+        // Update the map with current ownership data
+        updateMap();
+        
+        // Setup click handlers
+        setupTerritoryClickHandlers();
+        
+        console.log("Map created successfully");
+    }
+    
+    function verifyTerritoryData() {
+        console.log("Verifying territory data:", territoryData);
+        if (!territoryData || Object.keys(territoryData).length === 0) {
+            console.error("ERROR: Territory data is empty or undefined!");
+            addLogEntry("ERROR: Territory data not loaded properly. Please refresh the game.");
+            return false;
+        }
+        return true;
     }
     
     function canAttackTerritory(territoryId) {
-        // First check if it's the current player's turn
-        if (currentTurn !== playerId) {
+        // Make sure the game is active and it's the player's turn
+        if (!gameActive || currentTurn !== playerId) {
             return false;
         }
         
-        // Check if the territory exists
+        // Make sure the territory exists
+        if (!territoryData[territoryId]) {
+            return false;
+        }
+        
+        // Players can't attack their own territories
+        if (territoryData[territoryId].owner === playerId) {
+            return false;
+        }
+        
+        // Make sure the player has territories
+        if (!playerData.find(p => p.id === playerId)?.territories.length) {
+            return false;
+        }
+        
+        // Check if the territory is adjacent to any of the player's territories
+        // that are connected to the capital
+        const playerTerritories = playerData.find(p => p.id === playerId).territories;
+        const capital = playerData.find(p => p.id === playerId).capital;
         const targetTerritory = territoryData[territoryId];
-        if (!targetTerritory) {
-            return false;
-        }
         
-        // Check if the territory is already owned by the player
-        if (targetTerritory.owner === playerId) {
-            return false;
-        }
+        // First, find territories connected to the capital
+        const connectedTerritories = getTerritoriesConnectedToCapital(capital);
         
-        // Check if the player has any territories yet
-        const playerTerritories = Object.values(territoryData).filter(t => t.owner === playerId);
-        if (playerTerritories.length === 0) {
-            return false;
-        }
-        
-        // Check if the territory is adjacent to any of player's territories
-        return playerTerritories.some(playerTerritory => {
+        // Then check if any of these connected territories are adjacent to the target
+        return playerTerritories.some(playerTerritoryId => {
+            // Skip territories not connected to the capital
+            if (!connectedTerritories.has(playerTerritoryId)) {
+                return false;
+            }
+            
+            const playerTerritory = territoryData[playerTerritoryId];
             const dx = Math.abs(playerTerritory.x - targetTerritory.x);
             const dy = Math.abs(playerTerritory.y - targetTerritory.y);
+            
+            // Check adjacency (including diagonals)
             return (dx <= 1 && dy <= 1) && !(dx === 0 && dy === 0);
         });
+    }
+    
+    // Add a function to find territories connected to the capital using BFS
+    function getTerritoriesConnectedToCapital(capitalId) {
+        // Set to store connected territories
+        const connectedTerritories = new Set();
+        
+        // Queue for BFS
+        const queue = [capitalId];
+        
+        // Set to track visited territories
+        const visited = new Set([capitalId]);
+        
+        // Add capital to connected territories
+        connectedTerritories.add(capitalId);
+        
+        // Define adjacency check
+        function areAdjacent(t1, t2) {
+            const dx = Math.abs(t1.x - t2.x);
+            const dy = Math.abs(t1.y - t2.y);
+            return (dx <= 1 && dy <= 1) && !(dx === 0 && dy === 0);
+        }
+        
+        // BFS to find all territories connected to capital
+        while (queue.length > 0) {
+            const currentId = queue.shift();
+            const currentTerritory = territoryData[currentId];
+            
+            // Skip if this territory doesn't exist or is not owned by the player
+            if (!currentTerritory || currentTerritory.owner !== playerId) {
+                continue;
+            }
+            
+            // Check all player-owned territories for adjacency
+            const playerTerritories = playerData.find(p => p.id === playerId).territories;
+            
+            playerTerritories.forEach(territoryId => {
+                // Skip already visited territories
+                if (visited.has(territoryId)) {
+                    return;
+                }
+                
+                const territory = territoryData[territoryId];
+                
+                // Skip territories not owned by the player
+                if (territory.owner !== playerId) {
+                    return;
+                }
+                
+                // Check if adjacent to current territory
+                if (areAdjacent(currentTerritory, territory)) {
+                    // Mark as visited
+                    visited.add(territoryId);
+                    
+                    // Add to connected territories
+                    connectedTerritories.add(territoryId);
+                    
+                    // Add to queue for further exploration
+                    queue.push(territoryId);
+                }
+            });
+        }
+        
+        return connectedTerritories;
     }
     
     function showQuizModal() {
@@ -447,6 +580,9 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedTerritory
         });
         
+        // Show the modal immediately to ensure it's visible
+        quizModal.classList.remove('hidden');
+        
         // Clear previous state
         questionText.textContent = currentQuestion.question;
         answersContainer.innerHTML = '';
@@ -460,7 +596,7 @@ document.addEventListener('DOMContentLoaded', () => {
             quizModal.classList.add(`duel-${duelRole}`);
             
             if (duelStatusEl) {
-                duelStatusEl.innerHTML = `<div>You are the ${duelRole}! Answer quickly!</div>`;
+                duelStatusEl.innerHTML = `<div>You are the ${duelRole}! Prepare for the duel...</div>`;
             }
             
             // Force a log entry to make the duel obvious
@@ -474,72 +610,68 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        // Show the modal immediately to ensure it's visible
-        quizModal.classList.remove('hidden');
+        // Record the start time for duels (adjusted for the delayed start)
+        duelStartTime = null; // Will be set when answers are revealed
         
-        // Record the start time for duels
-        duelStartTime = Date.now();
+        // Create a message showing "Reading question..."
+        const readingMsg = document.createElement('div');
+        readingMsg.classList.add('reading-message');
+        readingMsg.textContent = 'Reading question...';
+        answersContainer.appendChild(readingMsg);
         
-        // Create answer buttons
-        currentQuestion.answers.forEach((answer, index) => {
-            const button = document.createElement('button');
-            button.classList.add('answer-btn', 'hp-button');
-            button.textContent = answer;
-            button.dataset.index = index;
-            button.addEventListener('click', () => submitAnswer(index));
-            answersContainer.appendChild(button);
-        });
-        
-        // ===== NEW CODE: AUTO-REVEAL AFTER 3 SECONDS =====
-        // Schedule answer reveal after 3 seconds
-        let answerRevealTimerId = setTimeout(() => {
-            // Find the correct answer button and highlight it
-            const answerButtons = answersContainer.querySelectorAll('.answer-btn');
-            answerButtons.forEach((btn, index) => {
-                if (index === currentQuestion.correctAnswer) {
-                    btn.classList.add('correct-auto-reveal');
-                    
-                    // Add a small label that says "Correct Answer"
-                    const revealLabel = document.createElement('div');
-                    revealLabel.classList.add('answer-reveal-label');
-                    revealLabel.textContent = 'Correct Answer';
-                    btn.appendChild(revealLabel);
-                }
+        // PHASE 1: Show only the question for 3 seconds
+        // After 3 seconds, reveal the answer options
+        setTimeout(() => {
+            // Remove the reading message
+            answersContainer.innerHTML = '';
+            
+            // Update the status message
+            if (duelStatusEl && isDuelActive) {
+                duelStatusEl.innerHTML = `<div>You are the ${duelRole}! Answer quickly!</div>`;
+            }
+            
+            // Create answer buttons
+            currentQuestion.answers.forEach((answer, index) => {
+                const button = document.createElement('button');
+                button.classList.add('answer-btn', 'hp-button', 'answer-reveal-animation');
+                button.textContent = answer;
+                button.dataset.index = index;
+                button.addEventListener('click', () => submitAnswer(index));
+                answersContainer.appendChild(button);
             });
-        }, 3000);
-        
-        // Store this timer ID so we can clear it if needed
-        quizModal.dataset.answerRevealTimerId = answerRevealTimerId;
-        // ===== END NEW CODE =====
-        
-        // Set up the quiz timer
-        let timeLeft = 30;
-        timerElement.textContent = timeLeft;
-        
-        // Clear any existing timer
-        if (quizModal.dataset.timerId) {
-            clearInterval(parseInt(quizModal.dataset.timerId));
-        }
-        
-        const timerId = setInterval(() => {
-            timeLeft--;
+            
+            // Now set the duel start time when answers are shown
+            duelStartTime = Date.now();
+            
+            // Set up the quiz timer - started only AFTER answers are shown
+            let timeLeft = 30;
             timerElement.textContent = timeLeft;
             
-            // Add urgent class when time is running low
-            if (timeLeft <= 10) {
-                timerElement.classList.add('urgent');
+            // Clear any existing timer
+            if (quizModal.dataset.timerId) {
+                clearInterval(parseInt(quizModal.dataset.timerId));
             }
             
-            if (timeLeft <= 0) {
-                clearInterval(timerId);
-                timerElement.classList.remove('urgent');
-                // Auto-submit wrong answer if time runs out
-                submitAnswer(-1); // Invalid answer for both duel and non-duel
-            }
-        }, 1000);
-        
-        // Store timer ID to clear it later
-        quizModal.dataset.timerId = timerId;
+            const timerId = setInterval(() => {
+                timeLeft--;
+                timerElement.textContent = timeLeft;
+                
+                // Add urgent class when time is running low
+                if (timeLeft <= 10) {
+                    timerElement.classList.add('urgent');
+                }
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timerId);
+                    timerElement.classList.remove('urgent');
+                    // Auto-submit wrong answer if time runs out
+                    submitAnswer(-1); // Invalid answer for both duel and non-duel
+                }
+            }, 1000);
+            
+            // Store timer ID to clear it later
+            quizModal.dataset.timerId = timerId;
+        }, 3000);
     }
     
     function hideQuizModal() {
@@ -562,17 +694,18 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function submitAnswer(answerIndex) {
         if (!currentQuestion) {
-            debugDuel("Submit answer called but no current question!");
+            console.log("Submit answer called but no current question!");
             return;
         }
         
-        debugDuel(`Submitting answer: ${answerIndex} for ${isDuelActive ? 'DUEL' : 'regular question'}`);
+        console.log(`Submitting answer: ${answerIndex} for ${isDuelActive ? 'DUEL' : 'regular question'}`);
         
         // Always use duel-answer for duel scenarios
         if (isDuelActive) {
             const responseTime = Date.now() - duelStartTime;
+            const formattedTime = formatResponseTime(responseTime);
             
-            debugDuel(`Sending duel answer with response time: ${responseTime}ms`);
+            console.log(`Sending duel answer with response time: ${formattedTime}`);
             
             socket.emit('duel-answer', {
                 territoryId: selectedTerritory,
@@ -588,23 +721,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`;
             }
             
-            // Disable all answer buttons to prevent multiple submissions
+            // Color code and disable all answer buttons
             const answerButtons = answersContainer.querySelectorAll('.answer-btn');
-            answerButtons.forEach(btn => {
+            answerButtons.forEach((btn, index) => {
                 btn.disabled = true;
                 btn.classList.add('answered');
+                
+                // Add special highlight for the selected answer
+                if (parseInt(btn.dataset.index) === answerIndex) {
+                    btn.classList.add(duelRole === 'attacker' ? 'attacker-answer' : 'defender-answer');
+                }
             });
             
-            // Show which answer was selected
-            if (answerIndex >= 0) {
-                const selectedBtn = answersContainer.querySelector(`.answer-btn[data-index="${answerIndex}"]`);
-                if (selectedBtn) {
-                    selectedBtn.classList.add('selected-answer');
-                }
-            }
-            
             // Don't hide modal yet - wait for opponent
-            addLogEntry(`You answered in ${responseTime}ms. Waiting for opponent...`);
+            addLogEntry(`You answered in ${formattedTime}. Waiting for opponent...`);
         } else {
             // For non-duel questions, proceed as before
             socket.emit('submit-answer', {
@@ -741,46 +871,61 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Update the updateMap function to correctly handle territory states
+    // Update the updateMap function to properly handle capital status changes
     function updateMap() {
-        // Debug information
-        console.log("Updating map with territory data:", territoryData);
+        console.log('Updating map with territory data', territoryData);
         
-        // First, mark all territories as not-attackable
-        document.querySelectorAll('.territory').forEach(element => {
-            element.classList.remove('attackable');
-        });
+        if (!territoryData || Object.keys(territoryData).length === 0) {
+            console.error("ERROR: No territory data available!");
+            return;
+        }
         
-        // Then process each territory
-        Object.values(territoryData).forEach(territory => {
-            const territoryElement = document.querySelector(`.territory[data-id="${territory.id}"]`);
+        // Process all territories
+        document.querySelectorAll('.territory').forEach(territoryEl => {
+            const id = territoryEl.dataset.id;
+            if (!territoryData[id]) return;
             
-            if (territoryElement) {
-                // Update territory value display
-                const valueElement = territoryElement.querySelector('.territory-value');
-                if (valueElement) {
-                    valueElement.textContent = territory.value;
-                }
+            const territory = territoryData[id];
+            
+            // Reset all styling classes
+            territoryEl.className = 'territory';
+            
+            // Remove any existing labels
+            territoryEl.querySelectorAll('.territory-label').forEach(el => el.remove());
+            
+            // Set value
+            const valueEl = territoryEl.querySelector('.territory-value');
+            if (valueEl) valueEl.textContent = territory.value || '1';
+            
+            // Add player styling if owned
+            if (territory.owner) {
+                // Determine house/color based on player index
+                const playerIndex = playerData.findIndex(p => p.id === territory.owner);
+                const houses = ['gryffindor', 'slytherin', 'ravenclaw', 'hufflepuff'];
+                const houseClass = houses[playerIndex % houses.length];
                 
-                // Remove all house classes
-                territoryElement.classList.remove('gryffindor', 'slytherin', 'ravenclaw');
+                territoryEl.classList.add(houseClass);
                 
-                // Set owner's color
-                if (territory.owner) {
-                    const player = playerData.find(p => p.id === territory.owner);
-                    if (player) {
-                        const playerIndex = playerData.findIndex(p => p.id === player.id);
-                        const houses = ['gryffindor', 'slytherin', 'ravenclaw'];
-                        territoryElement.classList.add(houses[playerIndex % houses.length]);
-                    }
-                }
-                
-                // Check if this territory is attackable by the current player
-                if (canAttackTerritory(territory.id)) {
-                    territoryElement.classList.add('attackable');
-                }
+                // Add owner label
+                const ownerName = playerData.find(p => p.id === territory.owner)?.name || '?';
+                const label = document.createElement('div');
+                label.classList.add('territory-label');
+                label.textContent = ownerName.charAt(0).toUpperCase();
+                territoryEl.appendChild(label);
+            }
+            
+            // Add capital styling if applicable
+            if (territory.isCapital) {
+                territoryEl.classList.add('capital');
+            }
+            
+            // Add attackable styling if applicable
+            if (currentTurn === playerId && canAttackTerritory(id)) {
+                territoryEl.classList.add('attackable');
             }
         });
+        
+        console.log('Map update complete');
     }
 
     // Add this function to your client-side code
@@ -863,18 +1008,28 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 
+                // First check if it's the player's turn
+                if (currentTurn !== playerId) {
+                    addLogEntry("It's not your turn");
+                    return;
+                }
+                
+                // Then check if it's attackable or already owned
                 if (canAttackTerritory(territoryId)) {
                     console.log(`Attacking territory ${territoryId}`);
                     socket.emit('attack-territory', territoryId);
                     addLogEntry(`You attacked territory ${territoryId}`);
                 } else if (territoryData[territoryId] && territoryData[territoryId].owner === playerId) {
                     addLogEntry('You already own this territory');
-                } else if (currentTurn !== playerId) {
-                    addLogEntry("It's not your turn");
                 } else {
                     addLogEntry('You can only attack adjacent territories');
                 }
             });
         });
+    }
+
+    // Add this helper function to format milliseconds as seconds
+    function formatResponseTime(ms) {
+        return (ms / 1000).toFixed(2) + 's';
     }
 }); 
