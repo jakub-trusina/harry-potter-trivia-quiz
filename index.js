@@ -560,39 +560,57 @@ function initializeGame() {
   io.emit('turn-update', gameState.currentTurn);
 }
 
-// Helper function to determine capital positions based on player count
+// Update the getCapitalPositions function for more balanced starting positions
 function getCapitalPositions(playerCount, gridWidth, gridHeight) {
-  const positions = [];
-  
-  if (playerCount === 2) {
-    // 2 players: opposite diagonal corners
-    positions.push({x: 0, y: 0});
-    positions.push({x: gridWidth-1, y: gridHeight-1});
-  } 
-  else if (playerCount === 3) {
-    // 3 players: two neighboring corners and one in the middle of opposite side
-    positions.push({x: 0, y: 0});                   // Top-left corner
-    positions.push({x: 0, y: gridHeight-1});        // Bottom-left corner
-    positions.push({x: gridWidth-1, y: Math.floor(gridHeight/2)}); // Middle of right side
-  } 
-  else if (playerCount === 4) {
-    // 4 players: each in a corner
-    positions.push({x: 0, y: 0});                   // Top-left
-    positions.push({x: gridWidth-1, y: 0});         // Top-right
-    positions.push({x: 0, y: gridHeight-1});        // Bottom-left
-    positions.push({x: gridWidth-1, y: gridHeight-1}); // Bottom-right
+  // Defensive positioning - array of coordinates [x, y]
+  switch(playerCount) {
+    case 1:
+      return [{x: 0, y: 0}]; // Single player in top-left
+      
+    case 2:
+      return [
+        {x: 0, y: 0},           // Player 1: top-left
+        {x: gridWidth-1, y: gridHeight-1}  // Player 2: bottom-right (maximum distance)
+      ];
+      
+    case 3:
+      // Triangle formation with buffer zones
+      return [
+        {x: 0, y: 0},              // Player 1: top-left
+        {x: gridWidth-1, y: 0},    // Player 2: top-right
+        {x: Math.floor(gridWidth/2), y: gridHeight-1}  // Player 3: bottom-middle
+      ];
+      
+    case 4:
+      // Modified corners with slight buffer
+      return [
+        {x: 0, y: 0},                    // Player 1: top-left
+        {x: gridWidth-1, y: 0},          // Player 2: top-right
+        {x: 0, y: gridHeight-1},         // Player 3: bottom-left
+        {x: gridWidth-1, y: gridHeight-1}  // Player 4: bottom-right
+      ];
+      
+    default:
+      // For more than 4 players or fallback
+      const positions = [];
+      for (let i = 0; i < playerCount; i++) {
+        // Distribute evenly around the perimeter
+        const angle = (i / playerCount) * 2 * Math.PI;
+        const radius = Math.min(gridWidth, gridHeight) / 2 - 1; // Buffer from edge
+        const centerX = gridWidth / 2;
+        const centerY = gridHeight / 2;
+        
+        const x = Math.floor(centerX + radius * Math.cos(angle));
+        const y = Math.floor(centerY + radius * Math.sin(angle));
+        
+        // Ensure within grid bounds
+        const boundedX = Math.max(1, Math.min(gridWidth - 2, x));
+        const boundedY = Math.max(1, Math.min(gridHeight - 2, y));
+        
+        positions.push({x: boundedX, y: boundedY});
+      }
+      return positions;
   }
-  else {
-    // Fallback for other player counts (shouldn't happen)
-    for (let i = 0; i < playerCount; i++) {
-      positions.push({
-        x: Math.floor(i * gridWidth / playerCount),
-        y: Math.floor(i * gridHeight / playerCount)
-      });
-    }
-  }
-  
-  return positions;
 }
 
 // Helper function to assign territories to a player using BFS
