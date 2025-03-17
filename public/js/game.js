@@ -16,6 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let isDuelActive = false;
     let duelStartTime = 0;
     let duelRole = null;
+    let isObserving = false;
+    let territoryValue = 1;
     
     // DOM elements
     const loginScreen = document.getElementById('login-screen');
@@ -61,26 +63,54 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    socket.on('game-started', (data) => {
-        console.log("Game started with territories:", data.territories);
-        // Log the total value of all territories to check if they have values
-        const totalGameValue = Object.values(data.territories).reduce((sum, t) => sum + t.value, 0);
-        console.log("Total game territory value:", totalGameValue);
+    socket.on('game-start', (data) => {
+        console.log("🎮 Game started with data:", data);
         
+        // Make sure this code runs
+        console.log("🏁 Starting game UI transition");
+        
+        // Hide lobby and show game
+        lobbyScreen.classList.add('hidden');
+        gameScreen.classList.remove('hidden');
+        
+        // Set game active flag
+        gameActive = true;
+        
+        // Reset game variables
         territoryData = data.territories;
         playerData = data.players;
         currentTurn = data.currentTurn;
         
-        // Start the game session
-        startGameSession();
+        // Ensure scores start at 0
+        playerData.forEach(player => {
+            if (typeof player.score === 'undefined') {
+                player.score = 0;
+            }
+        });
         
-        // Clearly announce whose turn it is
+        // Create map
+        createMap(data.territories);
+        setupTerritoryClickHandlers();
+        
+        // Update player stats
+        updatePlayerStats(data.players);
+        
+        // Add log entry
+        addLogEntry("The territory conquest has begun! Answer questions to capture territories.");
+        
+        // Show whose turn it is
         if (currentTurn === playerId) {
-            addLogEntry("Game started! It's your turn first.");
+            addLogEntry("It's your turn first!");
         } else {
-            const player = playerData.find(p => p.id === currentTurn);
-            addLogEntry(`Game started! ${player ? player.name : 'Another player'} goes first.`);
+            const firstPlayer = playerData.find(p => p.id === currentTurn);
+            addLogEntry(`${firstPlayer ? firstPlayer.name : 'Another player'} goes first.`);
         }
+    });
+    
+    socket.on('game-started', (data) => {
+        console.log("⚠️ Received 'game-started' instead of 'game-start'");
+        // Redirect to the proper handler
+        socket.emit('game-start', data);
     });
     
     socket.on('territory-update', (territories) => {
@@ -130,27 +160,73 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     socket.on('question-challenge', (data) => {
-        debugDuel(`Received question challenge: ${data.isDuel ? 'DUEL' : 'REGULAR'} as ${data.role || 'N/A'}`);
-        debugDuel(`Question: ${data.question.question}`);
+        console.log("QUIZ DEBUG: Received question challenge:", data);
+        
+        // Validate question data
+        if (!data || !data.question) {
+            console.error("QUIZ ERROR: Invalid question data received:", data);
+            return;
+        }
         
         currentQuestion = data.question;
         selectedTerritory = data.territoryId;
         isDuelActive = data.isDuel === true;
-        duelRole = data.role;
+        duelRole = data.role || 'observer';
+        isObserving = data.observing === true;
+        territoryValue = data.territoryValue || 1;
+        duelStartTime = Date.now();
         
+        // Add a log entry about the question
+        if (isObserving) {
+            addLogEntry(`You are observing a duel for territory ${data.territoryId}. Answer to earn points!`);
+        }
+        
+        // Show quiz modal with appropriate context
         showQuizModal();
     });
     
     socket.on('game-over', (data) => {
-        console.log("Game over event received:", data);
+        const traditionalWinner = data.traditionalWinner;
+        const pointsWinner = data.pointsWinner;
         
-        // Only show game over modal if the game was active
-        if (gameActive) {
-            gameActive = false;
-            showGameOver(data);
+        // Hide game screen
+        gameScreen.classList.add('hidden');
+        
+        // Show game over modal
+        gameOverModal.classList.remove('hidden');
+        
+        // Set winner text with both types of winners
+        if (traditionalWinner.id === pointsWinner.id) {
+            // Same player won both ways
+            winnerText.innerHTML = `
+                <div class="winner-announcement">
+                    <h3>${traditionalWinner.name} wins!</h3>
+                    <p>Last wizard standing AND highest score: ${pointsWinner.score} points</p>
+                </div>`;
         } else {
-            console.log("Ignored game-over event because game is not active");
+            // Different winners
+            winnerText.innerHTML = `
+                <div class="winner-announcement">
+                    <h3>Two Champions Emerge!</h3>
+                    <p><strong>${traditionalWinner.name}</strong> was the last wizard standing</p>
+                    <p><strong>${pointsWinner.name}</strong> earned the most points: ${pointsWinner.score}</p>
+                </div>`;
         }
+        
+        // Add custom message if provided
+        if (data.message) {
+            winnerText.innerHTML += `<p class="win-message">${data.message}</p>`;
+        }
+        
+        // Show stats for all players
+        winnerText.innerHTML += `<div class="final-scores">
+            <h4>Final Scores:</h4>
+            <ul>
+                ${playerData.map(player => 
+                    `<li>${player.name}: ${player.score} points</li>`
+                ).join('')}
+            </ul>
+        </div>`;
     });
     
     socket.on('error-message', (message) => {
@@ -178,6 +254,16 @@ document.addEventListener('DOMContentLoaded', () => {
                             'Unclaimed Territory';
         
         let message = '';
+        
+        // Add an observer-specific message if you were an observer
+        if (isObserving) {
+            const isCorrect = result.correctAnswer === quizModal.dataset.selectedAnswer;
+            const pointsMessage = isCorrect ? 
+                `You answered correctly as an observer (+${territoryValue} points)` : 
+                `You answered incorrectly as an observer (-1 point)`;
+            
+            addLogEntry(pointsMessage);
+        }
         
         // Clear explanation based on reason
         if (result.reason) {
@@ -286,10 +372,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             
-            // Close the modal after 5 seconds
-            setTimeout(() => {
-                hideQuizModal();
-            }, 5000);
+            // Check if this is a continuing attack result
+            const isContinuingAttack = result.continuingAttack === true;
+            
+            // If it's not a continuing attack, or if we're not the attacker/defender, hide the modal normally
+            if (!isContinuingAttack) {
+                // Set a delay to allow modal to be read before hiding
+                const hideDelay = result.defenseReduced ? 5000 : 3000;
+                
+                setTimeout(() => {
+                    // Only hide the modal if we're not in a new duel already
+                    if (!currentQuestion) {
+                        hideQuizModal();
+                    }
+                }, hideDelay);
+            } else {
+                // For continuing attacks, don't close the modal - next round is coming
+                console.log("Continuing attack - keeping modal open for next round");
+            }
         }
         
         // Update the map
@@ -338,6 +438,29 @@ document.addEventListener('DOMContentLoaded', () => {
         addLogEntry(`Duel complete! Evaluating results...`);
     });
     
+    // Add a handler for the new "preparing next round" event
+    socket.on('preparing-next-round', (data) => {
+        console.log("Preparing next round:", data);
+        
+        // Add visual indicator that next round is coming
+        const duelStatusEl = document.getElementById('duel-status');
+        if (duelStatusEl) {
+            duelStatusEl.innerHTML += `
+                <div class="next-round-message">
+                    <strong>Preparing for Round ${data.round}...</strong>
+                    <div class="loading-indicator">
+                        <div class="loading-dot"></div>
+                        <div class="loading-dot"></div>
+                        <div class="loading-dot"></div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Don't hide the modal between rounds
+        // Instead, we'll show preparation indicator and wait for the next question
+    });
+    
     // Game functions
     function joinGame() {
         if (!playerNameInput.value.trim()) {
@@ -356,6 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function startGame() {
+        console.log("📣 Emitting start-game event to server");
         socket.emit('start-game');
     }
     
@@ -568,17 +692,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function showQuizModal() {
-        if (!currentQuestion) {
-            console.error("Tried to show quiz modal but no question is available!");
-            return;
+        console.log("QUIZ DEBUG: showQuizModal called");
+        
+        // IMPORTANT: Check if there's a force flag on currentQuestion
+        const forceShow = currentQuestion.forceShow === true;
+        
+        // Clean up any previous content first
+        const duelStatusEl = document.getElementById('duel-status');
+        if (duelStatusEl) {
+            duelStatusEl.innerHTML = ''; // Clear previous results/notices
         }
         
-        console.log("Showing quiz modal", {
-            question: currentQuestion.question,
-            isDuelActive,
-            duelRole,
-            selectedTerritory
-        });
+        const answersContainer = document.getElementById('answers-container');
+        if (answersContainer) {
+            answersContainer.innerHTML = ''; // Clear previous answers
+        }
+        
+        // Reset answer submitted flag
+        delete quizModal.dataset.answerSubmitted;
+        delete quizModal.dataset.selectedAnswer;
         
         // Show the modal immediately to ensure it's visible
         quizModal.classList.remove('hidden');
@@ -588,7 +720,6 @@ document.addEventListener('DOMContentLoaded', () => {
         answersContainer.innerHTML = '';
         
         const modalTitle = quizModal.querySelector('h2');
-        const duelStatusEl = document.getElementById('duel-status');
         
         if (isDuelActive) {
             modalTitle.textContent = `Wizard Duel - ${duelRole === 'attacker' ? 'Attack' : 'Defend'}!`;
@@ -672,6 +803,22 @@ document.addEventListener('DOMContentLoaded', () => {
             // Store timer ID to clear it later
             quizModal.dataset.timerId = timerId;
         }, 3000);
+        
+        // Show modal and make sure it stays visible
+        quizModal.style.display = 'block';
+        quizModal.classList.remove('hidden');
+        console.log("QUIZ MODAL SHOWN - SHOULD BE VISIBLE NOW");
+        
+        // If it's a continuing attack, add a notice
+        if (currentQuestion.continuing) {
+            const continueNotice = document.createElement('div');
+            continueNotice.classList.add('continuing-attack-notice');
+            continueNotice.innerHTML = `
+                <strong>Continuing Attack!</strong>
+                <p>Round ${currentQuestion.round || '?'} - Defeat the remaining defenses</p>
+            `;
+            duelStatusEl.appendChild(continueNotice);
+        }
     }
     
     function hideQuizModal() {
@@ -692,7 +839,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectedTerritory = null;
     }
     
-    function submitAnswer(answerIndex) {
+    function submitAnswer(answerIndex, isRandom = false) {
         if (!currentQuestion) {
             console.log("Submit answer called but no current question!");
             return;
@@ -700,25 +847,36 @@ document.addEventListener('DOMContentLoaded', () => {
         
         console.log(`Submitting answer: ${answerIndex} for ${isDuelActive ? 'DUEL' : 'regular question'}`);
         
-        // Always use duel-answer for duel scenarios
-        if (isDuelActive) {
+        // Mark that we've submitted an answer
+        quizModal.dataset.answerSubmitted = 'true';
+        
+        if (isDuelActive || isObserving) {
+            // Calculate response time
             const responseTime = Date.now() - duelStartTime;
             const formattedTime = formatResponseTime(responseTime);
             
-            console.log(`Sending duel answer with response time: ${formattedTime}`);
+            console.log(`Sending ${isObserving ? 'observer' : 'duel'} answer with response time: ${formattedTime}`);
             
+            // Send answer with observer flag if applicable
             socket.emit('duel-answer', {
                 territoryId: selectedTerritory,
                 answer: answerIndex,
-                responseTime: responseTime
+                responseTime: responseTime,
+                isObserver: isObserving
             });
             
-            // Update the UI to show waiting state
-            const duelStatusEl = document.getElementById('duel-status');
-            if (duelStatusEl) {
-                duelStatusEl.innerHTML += `<div class="waiting-state">
-                    <strong>Answer submitted! Waiting for opponent...</strong>
-                </div>`;
+            // Update UI to show waiting state
+            const statusEl = document.getElementById('duel-status');
+            if (statusEl) {
+                if (isObserving) {
+                    statusEl.innerHTML += `<div class="observer-status">
+                        <strong>Answer submitted as observer! Waiting for duel to resolve...</strong>
+                    </div>`;
+                } else {
+                    statusEl.innerHTML += `<div class="waiting-state">
+                        <strong>Answer submitted! Waiting for other participants...</strong>
+                    </div>`;
+                }
             }
             
             // Color code and disable all answer buttons

@@ -16,7 +16,8 @@ const gameState = {
   territories: {},
   currentTurn: null, // Track the current player's turn
   questions: [],
-  activeGames: {}
+  activeGames: {},
+  gameActive: true
 };
 
 // Load Harry Potter questions
@@ -40,7 +41,8 @@ io.on('connection', (socket) => {
       name: playerName,
       score: 0,
       territories: [],
-      capital: null
+      capital: null,
+      eliminated: false
     };
     
     io.emit('player-list-update', Object.values(gameState.players));
@@ -51,10 +53,10 @@ io.on('connection', (socket) => {
   socket.on('start-game', () => {
     if (Object.keys(gameState.players).length >= 2) {
       initializeGame();
-      io.emit('game-started', {
+      io.emit('game-start', {
         territories: gameState.territories,
         players: Object.values(gameState.players),
-        currentTurn: gameState.currentTurn // Send initial turn info
+        currentTurn: gameState.currentTurn
       });
     } else {
       socket.emit('error-message', 'Need at least 2 players to start');
@@ -177,7 +179,8 @@ io.on('connection', (socket) => {
       defenderId: defenderId,
       question: question,
       startTime: Date.now(),
-      answers: {}
+      answers: {},
+      observers: []
     };
     
     // Send question challenge to attacker
@@ -210,11 +213,59 @@ io.on('connection', (socket) => {
       gameState.activeGames[territoryId].noDefender = true;
       console.log(`DUEL: No defender for territory ${territoryId}`);
     }
+    
+    // Now send to all other active players as observers
+    sendQuestionToObservers(territoryId, question, gameState.activeGames[territoryId]);
   });
 
   // Fix duel-answer handler to properly manage territory ownership
   socket.on('duel-answer', (data) => {
-    const { territoryId, answer, responseTime } = data;
+    const { territoryId, answer, responseTime, isObserver } = data;
+    
+    // Observer handling
+    if (isObserver) {
+      console.log(`OBSERVER ANSWER: Observer ${socket.id} answered for territory ${territoryId}`);
+      
+      // Make sure the duel and player exist
+      if (!gameState.activeGames[territoryId] || !gameState.players[socket.id]) {
+        return;
+      }
+      
+      const duel = gameState.activeGames[territoryId];
+      
+      // Initialize observer answers object if needed
+      if (!duel.observerAnswers) {
+        duel.observerAnswers = {};
+      }
+      
+      // Record observer's answer
+      duel.observerAnswers[socket.id] = {
+        answer,
+        responseTime,
+        timestamp: Date.now()
+      };
+      
+      // Calculate points for observer
+      const isCorrect = answer === duel.question.correctAnswer;
+      const territoryValue = gameState.territories[territoryId].value || 1;
+      
+      // Award or deduct points
+      if (isCorrect) {
+        gameState.players[socket.id].score += territoryValue;
+        socket.emit('info-message', `Correct! +${territoryValue} points`);
+      } else {
+        gameState.players[socket.id].score = Math.max(0, gameState.players[socket.id].score - 1);
+        socket.emit('info-message', `Incorrect! -1 point`);
+      }
+      
+      // Notify all clients of the updated score
+      io.emit('player-list-update', Object.values(gameState.players));
+      
+      // Check if this completes all answers
+      checkAndProcessDuelResult(territoryId);
+      
+      return;
+    }
     
     console.log(`DUEL ANSWER: Answer received from ${socket.id} for territory ${territoryId}`);
     
@@ -249,193 +300,8 @@ io.on('connection', (socket) => {
       timestamp: Date.now()
     };
     
-    // Let everyone know this player has answered
-    const playerName = gameState.players[socket.id].name;
-    const role = socket.id === duel.attackerId ? 'Attacker' : 'Defender';
-    
-    console.log(`DUEL: ${playerName} (${role}) answered in ${responseTime}ms`);
-    
-    // Notify all clients that a player has answered
-    io.emit('duel-status-update', {
-      territoryId,
-      playerId: socket.id,
-      playerName,
-      role,
-      responseTime
-    });
-    
-    // Check if we have both answers
-    const hasAttackerAnswer = !!duel.answers[duel.attackerId];
-    const hasDefenderAnswer = duel.defenderId ? !!duel.answers[duel.defenderId] : true;
-    const allAnswersReceived = hasAttackerAnswer && hasDefenderAnswer;
-    
-    console.log(`DUEL: Status - Attacker answered: ${hasAttackerAnswer}, Defender answered: ${hasDefenderAnswer}`);
-    
-    if (!allAnswersReceived) {
-      // Still waiting for the other player
-      const waitingFor = !hasAttackerAnswer ? gameState.players[duel.attackerId].name : 
-                         !hasDefenderAnswer ? gameState.players[duel.defenderId].name : 'nobody';
-      
-      console.log(`DUEL: Waiting for ${waitingFor} to answer`);
-      socket.emit('info-message', `Your answer has been submitted. Waiting for ${waitingFor} to answer.`);
-      return;
-    }
-    
-    // If we get here, all answers are received
-    
-    console.log(`DUEL: All answers received for territory ${territoryId}, resolving duel...`);
-    
-    // Signal to clients to close quiz modals
-    io.to(duel.attackerId).emit('duel-complete', { territoryId });
-    if (duel.defenderId) {
-      io.to(duel.defenderId).emit('duel-complete', { territoryId });
-    }
-    
-    // IMPORTANT: Create a stable copy of the duel data for evaluation
-    const duelData = { ...duel };
-    
-    // Wait for modals to close, then process the result
-    setTimeout(() => {
-      // Ensure the duel hasn't been processed already
-      if (!gameState.activeGames[territoryId]) {
-        console.log(`DUEL: Duel ${territoryId} already processed, skipping`);
-        return;
-      }
-      
-      console.log(`DUEL: Evaluating duel result for territory ${territoryId}`);
-      
-      // Determine the winner
-      const attackerAnswer = duelData.answers[duelData.attackerId];
-      const attackerCorrect = attackerAnswer.answer === duelData.question.correctAnswer;
-      
-      let winnerId = null;
-      let winReason = '';
-      
-      // Logic to determine the winner
-      if (!duelData.defenderId) {
-        // Undefended territory
-        if (attackerCorrect) {
-          winnerId = duelData.attackerId;
-          winReason = 'Attacker answered correctly and claimed undefended territory';
-        } else {
-          winnerId = null;
-          winReason = 'Attacker answered incorrectly, territory remains unclaimed';
-        }
-      } else {
-        // Contested territory
-        const defenderAnswer = duelData.answers[duelData.defenderId];
-        const defenderCorrect = defenderAnswer.answer === duelData.question.correctAnswer;
-        
-        if (attackerCorrect && defenderCorrect) {
-          // Both correct - speed decides
-          if (attackerAnswer.responseTime < defenderAnswer.responseTime) {
-            winnerId = duelData.attackerId;
-            winReason = 'Both answered correctly, but attacker was faster';
-          } else {
-            winnerId = duelData.defenderId;
-            winReason = 'Both answered correctly, but defender was faster';
-          }
-        } else if (attackerCorrect) {
-          winnerId = duelData.attackerId;
-          winReason = 'Attacker answered correctly, defender did not';
-        } else if (defenderCorrect) {
-          winnerId = duelData.defenderId;
-          winReason = 'Defender answered correctly, attacker did not';
-        } else {
-          // Both wrong, defender keeps territory
-          winnerId = duelData.defenderId;
-          winReason = 'Neither answered correctly, territory stays with defender';
-        }
-      }
-      
-      console.log(`DUEL RESULT: ${winReason}`);
-      
-      // Update territory ownership if attacker wins
-      if (winnerId === duelData.attackerId) {
-        // Check if this was a capital
-        const wasCapital = gameState.territories[territoryId].isCapital;
-        let originalOwner = null;
-        
-        if (wasCapital) {
-          // Find the original owner
-          originalOwner = Object.keys(gameState.players).find(id => 
-            gameState.players[id].capital === territoryId
-          );
-        }
-        
-        // Remove from previous owner if there was one (CRITICAL - THIS WAS MISSING)
-        if (duelData.defenderId) {
-          gameState.players[duelData.defenderId].territories = 
-            gameState.players[duelData.defenderId].territories.filter(id => id !== territoryId);
-        }
-        
-        // Update ownership in the territory object
-        gameState.territories[territoryId].owner = duelData.attackerId;
-        
-        // Add to attacker's territory list
-        if (!gameState.players[duelData.attackerId].territories.includes(territoryId)) {
-          gameState.players[duelData.attackerId].territories.push(territoryId);
-        }
-        
-        // If it was a capital, handle capital capture properly
-        if (wasCapital) {
-          // Set isCapital to false since it's been captured
-          gameState.territories[territoryId].isCapital = false;
-          
-          // Log the capital capture
-          if (originalOwner && originalOwner !== duelData.attackerId) {
-            io.emit('game-log', `${gameState.players[duelData.attackerId].name} has captured ${gameState.players[originalOwner].name}'s capital!`);
-          }
-        }
-        
-        // Check win condition
-        checkWinCondition();
-      }
-      
-      // Send the result to all clients
-      io.emit('duel-result', {
-        territoryId,
-        winner: winnerId === duelData.attackerId ? 'attacker' : 
-                winnerId === duelData.defenderId ? 'defender' : 'none',
-        reason: winReason,
-        attackerId: duelData.attackerId,
-        defenderId: duelData.defenderId,
-        attackerAnswer: attackerAnswer.answer,
-        defenderAnswer: duelData.defenderId ? duelData.answers[duelData.defenderId].answer : null,
-        attackerCorrect,
-        defenderCorrect: duelData.defenderId && 
-                        duelData.answers[duelData.defenderId].answer === duelData.question.correctAnswer,
-        attackerTime: attackerAnswer.responseTime,
-        defenderTime: duelData.defenderId ? duelData.answers[duelData.defenderId].responseTime : null,
-        correctAnswer: duelData.question.correctAnswer,
-        question: duelData.question.question,
-        answerText: duelData.question.answers[duelData.question.correctAnswer]
-      });
-      
-      // Update clients with territory and player data
-      io.emit('territory-update', gameState.territories);
-      io.emit('player-list-update', Object.values(gameState.players));
-      
-      // CRITICAL: Delete the active game BEFORE advancing turn
-      delete gameState.activeGames[territoryId];
-      
-      // Log the turn before advancing
-      const currentPlayerName = gameState.players[gameState.currentTurn].name;
-      console.log(`TURNS: Current turn before advancing: ${currentPlayerName}`);
-      
-      // Advance to the next player
-      advanceToNextTurn();
-      
-      const nextPlayerName = gameState.players[gameState.currentTurn].name;
-      console.log(`TURNS: Advanced turn to: ${nextPlayerName}`);
-      
-      // Notify clients of the turn change
-      io.emit('turn-update', gameState.currentTurn);
-      
-      // Add a log entry about the turn change
-      io.emit('game-log', `It's now ${nextPlayerName}'s turn.`);
-      
-    }, 1000); // Delay to allow UI updates
+    // Check if all answers are received
+    checkAndProcessDuelResult(territoryId);
   });
 });
 
@@ -662,84 +528,58 @@ function assignTerritoriesToPlayer(playerId, startTerritory, count, assignedTerr
   console.log(`Assigned ${territoriesToAssign.length} territories to player ${playerId} near (${startX}, ${startY})`);
 }
 
-// Update the checkWinCondition function to handle player elimination
+// Modify the checkWinCondition function to check for both types of winners
 function checkWinCondition() {
-  const playerIds = Object.keys(gameState.players);
+  // Check for traditional winner (last player with a capital)
+  const playersWithCapitals = Object.keys(gameState.players).filter(id => {
+    // Player has a capital that they still own
+    return gameState.players[id].capital && 
+           gameState.territories[gameState.players[id].capital] &&
+           gameState.territories[gameState.players[id].capital].owner === id;
+  });
   
-  // Check if any player has lost their capital
-  playerIds.forEach(playerId => {
-    const player = gameState.players[playerId];
-    const capital = player.capital;
-    
-    // Skip players who have already been marked as eliminated
-    if (player.eliminated) return;
-    
-    // Check if this player's capital is owned by someone else
-    if (gameState.territories[capital] && gameState.territories[capital].owner !== playerId) {
-      // Player has lost their capital - mark as eliminated
-      player.eliminated = true;
-      
-      // Capture message
-      const capturingPlayerId = gameState.territories[capital].owner;
-      const capturingPlayerName = gameState.players[capturingPlayerId].name || 'Unknown';
-      
-      // Announce elimination
-      io.emit('player-eliminated', {
-        playerId: playerId,
-        playerName: player.name,
-        eliminatedBy: capturingPlayerName
-      });
-      
-      io.emit('game-log', `${player.name}'s capital has been captured by ${capturingPlayerName}!`);
-      
-      // Convert their territories to neutral (except the capital which stays with the capturer)
-      convertTerritoriesToNeutral(playerId, capital);
+  // Check for points leader
+  let highestScore = -1;
+  let pointsLeader = null;
+  
+  Object.keys(gameState.players).forEach(id => {
+    if (gameState.players[id].score > highestScore) {
+      highestScore = gameState.players[id].score;
+      pointsLeader = id;
     }
   });
   
-  // Check if only one player remains (final win condition)
-  const activePlayers = playerIds.filter(id => !gameState.players[id].eliminated);
-  
-  if (activePlayers.length === 1) {
-    const winner = gameState.players[activePlayers[0]];
+  // Traditional win condition
+  if (playersWithCapitals.length === 1) {
+    const traditionalWinnerId = playersWithCapitals[0];
+    const pointsWinnerId = pointsLeader;
+    
+    // Prepare the winners announcement
+    let winMessage = `Game over! ${gameState.players[traditionalWinnerId].name} is the last wizard standing!`;
+    
+    // If points winner is different, announce both
+    if (pointsWinnerId !== traditionalWinnerId) {
+      winMessage += ` However, ${gameState.players[pointsWinnerId].name} earned the most points (${gameState.players[pointsWinnerId].score})!`;
+    } else {
+      winMessage += ` They also earned the most points (${gameState.players[pointsWinnerId].score})!`;
+    }
+    
     io.emit('game-over', {
-      winner: winner,
-      reason: 'Last wizard standing!'
+      traditionalWinner: gameState.players[traditionalWinnerId],
+      pointsWinner: gameState.players[pointsWinnerId],
+      message: winMessage
     });
-  }
-}
-
-// Update the convertTerritoriesToNeutral function to handle capital styling
-function convertTerritoriesToNeutral(playerId, exceptTerritoryId) {
-  console.log(`Converting ${playerId}'s territories to neutral (except ${exceptTerritoryId})`);
-  
-  // Go through all territories
-  Object.values(gameState.territories).forEach(territory => {
-    // If owned by the eliminated player and not the excepted territory
-    if (territory.owner === playerId && territory.id !== exceptTerritoryId) {
-      // Convert to neutral
-      territory.owner = null;
-      
-      // If it was a capital, it's no longer a capital
-      if (territory.isCapital) {
-        territory.isCapital = false;
-      }
-    }
-  });
-  
-  // The capital that was captured should no longer be a capital for the defeated player
-  // but remains owned by the capturing player
-  const capturedCapital = gameState.territories[exceptTerritoryId];
-  if (capturedCapital) {
-    capturedCapital.isCapital = false;
-    console.log(`Removing capital status from captured territory ${exceptTerritoryId}`);
+    
+    console.log(`Game over! Traditional winner: ${gameState.players[traditionalWinnerId].name}, Points winner: ${gameState.players[pointsWinnerId].name}`);
+    
+    // Reset game state
+    gameState.gameActive = false;
+    gameState.currentTurn = null;
+    
+    return true;
   }
   
-  // Update the player's territory list to be empty
-  gameState.players[playerId].territories = [];
-  
-  // Send territory update to all clients
-  io.emit('territory-update', gameState.territories);
+  return false;
 }
 
 // Update the advanceToNextTurn function to properly handle eliminated players
@@ -827,6 +667,380 @@ function advanceToNextTurn() {
         console.log(`ABNORMAL TURN ADVANCE: Setting turn to ${gameState.players[gameState.currentTurn].name}`);
         io.emit('turn-update', gameState.currentTurn);
     }
+}
+
+// Add this function to send questions to non-duel players
+function sendQuestionToObservers(territoryId, question, duelData) {
+  // Get all player IDs
+  const playerIds = Object.keys(gameState.players);
+  
+  // Get players who are not part of the duel
+  const observerIds = playerIds.filter(id => 
+    id !== duelData.attackerId && 
+    id !== duelData.defenderId &&
+    !gameState.players[id].eliminated
+  );
+  
+  console.log(`Sending question to ${observerIds.length} observers for duel on ${territoryId}`);
+  
+  // Send question to all observers
+  observerIds.forEach(playerId => {
+    const socket = io.sockets.sockets.get(playerId);
+    if (socket) {
+      socket.emit('question-challenge', {
+        question,
+        territoryId,
+        isDuel: false,
+        role: 'observer', // New role for non-duel participants
+        observing: true,  // Flag to indicate they're just observing
+        territoryValue: gameState.territories[territoryId].value || 1
+      });
+      
+      // Record that this player is observing
+      if (!duelData.observers) {
+        duelData.observers = [];
+      }
+      
+      duelData.observers.push(playerId);
+    }
+  });
+}
+
+// Fix 3: Add a new helper function to check and process duel results
+function checkAndProcessDuelResult(territoryId) {
+  const duel = gameState.activeGames[territoryId];
+  if (!duel) return false;
+  
+  // Check attacker and defender
+  const hasAttackerAnswer = !!duel.answers[duel.attackerId];
+  const hasDefenderAnswer = duel.defenderId ? !!duel.answers[duel.defenderId] : true;
+  
+  // Check observers - only count active observers
+  let pendingObservers = [];
+  if (duel.observers && duel.observers.length > 0) {
+    pendingObservers = duel.observers.filter(observerId => {
+      // Skip eliminated players
+      if (gameState.players[observerId]?.eliminated) return false;
+      
+      // Check if this observer has answered
+      return !duel.observerAnswers || !duel.observerAnswers[observerId];
+    });
+  }
+  
+  console.log(`DUEL CHECK: Attacker: ${hasAttackerAnswer}, Defender: ${hasDefenderAnswer}, Pending observers: ${pendingObservers.length}`);
+  
+  // Only process if attacker and defender have answered
+  // For observers, we'll allow the duel to complete if most have answered after a timeout
+  if (!hasAttackerAnswer || !hasDefenderAnswer) {
+    return false;
+  }
+  
+  // If there are still some observers pending but critical players have answered
+  if (pendingObservers.length > 0) {
+    // If this is the first time we're checking (no timeout set yet)
+    if (!duel.resultTimeoutSet) {
+      console.log(`DUEL: Critical players answered, waiting max 5 seconds for ${pendingObservers.length} observers`);
+      
+      duel.resultTimeoutSet = true;
+      
+      // Set a timeout to process the result anyway after 5 seconds
+      setTimeout(() => {
+        console.log(`DUEL: Observer wait timeout expired for territory ${territoryId}`);
+        processDuelResult(territoryId);
+      }, 5000);
+      
+      return false;
+    }
+    
+    // Otherwise wait for the timeout to expire
+    return false;
+  }
+  
+  // All answers received, process immediately
+  return processDuelResult(territoryId);
+}
+
+// Fix 4: Separate the duel result processing logic
+function processDuelResult(territoryId) {
+  console.log(`DUEL: Processing final result for territory ${territoryId}`);
+  
+  const duel = gameState.activeGames[territoryId];
+  if (!duel) {
+    console.log(`DUEL: No active duel found for territory ${territoryId}`);
+    return false;
+  }
+  
+  // Copy the existing duel resolution logic here
+  // Determine the winner
+  const attackerAnswer = duel.answers[duel.attackerId];
+  if (!attackerAnswer) {
+    console.error(`ERROR: Attacker answer not found in duel data for ${territoryId}`);
+    return false;
+  }
+  
+  const attackerCorrect = attackerAnswer.answer === duel.question.correctAnswer;
+  
+  let winnerId = null;
+  let winReason = '';
+  
+  // Winner determination logic...
+  // Copy the existing logic from the duel-answer setTimeout handler
+  
+  // Logic to determine the winner
+  if (!duel.defenderId) {
+    // Undefended territory
+    if (attackerCorrect) {
+      winnerId = duel.attackerId;
+      winReason = 'Attacker answered correctly and claimed undefended territory';
+    } else {
+      winnerId = null;
+      winReason = 'Attacker answered incorrectly, territory remains unclaimed';
+    }
+  } else {
+    // Contested territory
+    const defenderAnswer = duel.answers[duel.defenderId];
+    if (!defenderAnswer) {
+      console.error(`ERROR: Defender answer not found in duel data for ${territoryId}`);
+      return false;
+    }
+    
+    const defenderCorrect = defenderAnswer.answer === duel.question.correctAnswer;
+    
+    if (attackerCorrect && defenderCorrect) {
+      // Both correct - speed decides
+      if (attackerAnswer.responseTime < defenderAnswer.responseTime) {
+        winnerId = duel.attackerId;
+        winReason = 'Both answered correctly, but attacker was faster';
+      } else {
+        winnerId = duel.defenderId;
+        winReason = 'Both answered correctly, but defender was faster';
+      }
+    } else if (attackerCorrect) {
+      winnerId = duel.attackerId;
+      winReason = 'Attacker answered correctly, defender answered incorrectly';
+    } else if (defenderCorrect) {
+      winnerId = duel.defenderId;
+      winReason = 'Defender answered correctly, attacker answered incorrectly';
+    } else {
+      // Both incorrect, defender keeps territory
+      winnerId = duel.defenderId;
+      winReason = 'Both answered incorrectly, defender keeps territory';
+    }
+  }
+  
+  // Award points for duel participants
+  const territoryValue = gameState.territories[territoryId].value || 1;
+  
+  // Attacker points
+  if (attackerCorrect) {
+    gameState.players[duel.attackerId].score += territoryValue;
+    io.to(duel.attackerId).emit('info-message', `Correct! +${territoryValue} points`);
+  }
+  
+  // Defender points
+  if (duel.defenderId && duel.answers[duel.defenderId]?.answer === duel.question.correctAnswer) {
+    gameState.players[duel.defenderId].score += territoryValue;
+    io.to(duel.defenderId).emit('info-message', `Correct! +${territoryValue} points`);
+  }
+  
+  // Rest of duel processing (territory ownership changes, etc.)
+  // Copy and adapt from the existing code
+  
+  // Update territory if attacker wins
+  if (winnerId === duel.attackerId) {
+    const territory = gameState.territories[territoryId];
+    const isCapital = territory.isCapital;
+    
+    // For capitals: special handling - one attack per turn
+    if (isCapital) {
+      // Decrease capital value
+      if (territory.value > 0) {
+        territory.value--;
+        io.emit('game-log', `${gameState.players[duel.attackerId].name} damages the capital! Defense reduced to ${territory.value}.`);
+        
+        // If capital is destroyed (value === 0), transfer ownership
+        if (territory.value === 0) {
+          // Transfer ownership
+          const previousOwner = territory.owner;
+          territory.owner = duel.attackerId;
+          
+          // Add to attacker territories
+          if (!gameState.players[duel.attackerId].territories.includes(territoryId)) {
+            gameState.players[duel.attackerId].territories.push(territoryId);
+          }
+          
+          // Remove from previous owner
+          if (previousOwner) {
+            gameState.players[previousOwner].territories = 
+              gameState.players[previousOwner].territories.filter(id => id !== territoryId);
+          }
+          
+          io.emit('game-log', `${gameState.players[duel.attackerId].name} has captured the capital of ${gameState.players[previousOwner].name}!`);
+          
+          // Check if the player has been eliminated
+          if (previousOwner) {
+            // Mark player as eliminated
+            gameState.players[previousOwner].eliminated = true;
+            io.emit('player-eliminated', {
+              playerId: previousOwner,
+              playerName: gameState.players[previousOwner].name,
+              eliminatedBy: gameState.players[duel.attackerId].name
+            });
+          }
+        }
+      }
+    } else {
+      // For regular territories: multi-round system
+      if (territory.value > 1) {
+        // Decrease value
+        territory.value--;
+        io.emit('game-log', `${gameState.players[duel.attackerId].name} weakens the territory's defense to ${territory.value}!`);
+        
+        // Send update to all clients
+        io.emit('territory-update', gameState.territories);
+        
+        // Notify of defense reduction
+        io.emit('duel-result', {
+          territoryId,
+          winner: 'attacker',
+          reason: `Attacker weakened territory defense to level ${territory.value}`,
+          attackerId: duel.attackerId,
+          defenderId: duel.defenderId,
+          attackerAnswer: attackerAnswer.answer,
+          defenderAnswer: duel.defenderId ? duel.answers[duel.defenderId].answer : null,
+          attackerCorrect,
+          defenderCorrect: duel.defenderId && 
+                          duel.answers[duel.defenderId].answer === duel.question.correctAnswer,
+          attackerTime: attackerAnswer.responseTime,
+          defenderTime: duel.defenderId ? duel.answers[duel.defenderId].responseTime : null,
+          correctAnswer: duel.question.correctAnswer,
+          question: duel.question.question,
+          answerText: duel.question.answers[duel.question.correctAnswer],
+          defenseLevel: territory.value,
+          defenseReduced: true,
+          continuingAttack: true
+        });
+        
+        // Clean up this game
+        delete gameState.activeGames[territoryId];
+        
+        // IMPORTANT: Notify clients that next round is being prepared
+        io.emit('preparing-next-round', {
+          territoryId,
+          attackerId: duel.attackerId,
+          defenderId: duel.defenderId,
+          round: (duel.round || 1) + 1
+        });
+        
+        // IMPORTANT: Continue with the next attack round
+        setTimeout(() => {
+          // Get a new question for the next round
+          const question = getRandomQuestion();
+          
+          if (!question) {
+            console.log(`ERROR: No questions available for continued attack`);
+            advanceToNextTurn();
+            return;
+          }
+          
+          // Create new duel data for the same territory
+          gameState.activeGames[territoryId] = {
+            attackerId: duel.attackerId,
+            defenderId: duel.defenderId,
+            question: question,
+            startTime: Date.now(),
+            answers: {},
+            round: (duel.round || 1) + 1,
+            continuing: true
+          };
+          
+          // Log the continued attack
+          io.emit('game-log', `${gameState.players[duel.attackerId].name} continues attacking territory (Round ${gameState.activeGames[territoryId].round})`);
+          
+          // Send question to attacker with additional context
+          io.to(duel.attackerId).emit('question-challenge', {
+            question,
+            territoryId,
+            isDuel: true,
+            role: 'attacker',
+            round: gameState.activeGames[territoryId].round,
+            continuing: true,
+            forceShow: true
+          });
+          
+          // Send question to defender if there is one
+          if (duel.defenderId) {
+            const defenderSocket = io.sockets.sockets.get(duel.defenderId);
+            if (defenderSocket) {
+              defenderSocket.emit('question-challenge', {
+                question,
+                territoryId,
+                isDuel: true,
+                role: 'defender',
+                round: gameState.activeGames[territoryId].round,
+                continuing: true
+              });
+            }
+          }
+          
+          // Send to observers
+          sendQuestionToObservers(territoryId, question, gameState.activeGames[territoryId]);
+        }, 3000);
+        
+        return true;
+      } else {
+        // Territory captured (value = 0/1), transfer ownership
+        const previousOwner = territory.owner;
+        territory.owner = duel.attackerId;
+        
+        // Update territory lists
+        if (previousOwner) {
+          gameState.players[previousOwner].territories = 
+            gameState.players[previousOwner].territories.filter(id => id !== territoryId);
+        }
+        
+        // Add to attacker list if not already there
+        if (!gameState.players[duel.attackerId].territories.includes(territoryId)) {
+          gameState.players[duel.attackerId].territories.push(territoryId);
+        }
+        
+        io.emit('game-log', `${gameState.players[duel.attackerId].name} captured territory ${territoryId}!`);
+      }
+    }
+  }
+  
+  // Send the result to all clients
+  io.emit('duel-result', {
+    territoryId,
+    winner: winnerId === duel.attackerId ? 'attacker' : 
+            winnerId === duel.defenderId ? 'defender' : 'none',
+    reason: winReason,
+    attackerId: duel.attackerId,
+    defenderId: duel.defenderId,
+    attackerAnswer: attackerAnswer.answer,
+    defenderAnswer: duel.defenderId ? duel.answers[duel.defenderId].answer : null,
+    attackerCorrect,
+    defenderCorrect: duel.defenderId && 
+                    duel.answers[duel.defenderId].answer === duel.question.correctAnswer,
+    attackerTime: attackerAnswer.responseTime,
+    defenderTime: duel.defenderId ? duel.answers[duel.defenderId].responseTime : null,
+    correctAnswer: duel.question.correctAnswer,
+    question: duel.question.question,
+    answerText: duel.question.answers[duel.question.correctAnswer]
+  });
+  
+  // Clean up this game
+  delete gameState.activeGames[territoryId];
+  
+  // If we're not continuing (i.e., territory was captured or attack failed), advance turn
+  if (territory.value <= 1 || winnerId !== duel.attackerId) {
+    advanceToNextTurn();
+  }
+  
+  // Notify players of updated scores
+  io.emit('player-list-update', Object.values(gameState.players));
+  
+  return true;
 }
 
 // Start the server
