@@ -188,15 +188,20 @@ document.addEventListener('DOMContentLoaded', () => {
     function createMap(territories) {
         console.log("Creating map with territories:", territories);
         territoryData = territories;
-        mapContainerEl.innerHTML = '';
-        // Add current turn indicator
-        const turnIndicator = document.createElement('div');
-        turnIndicator.className = 'turn-indicator';
+        // Create and update turn indicator
+        const gameScreen = document.getElementById('game-screen');
+        let turnIndicator = document.querySelector('.turn-indicator');
+        if (!turnIndicator) {
+            turnIndicator = document.createElement('div');
+            turnIndicator.className = 'turn-indicator';
+            gameScreen?.insertBefore(turnIndicator, gameScreen.firstChild);
+        }
         const currentPlayer = playerData.find(p => p.id === gameState.currentTurn);
         turnIndicator.textContent = currentPlayer?.id === playerId ?
             "Your turn!" :
             `${currentPlayer?.name}'s turn`;
-        mapContainerEl.appendChild(turnIndicator);
+        // Clear and recreate map
+        mapContainerEl.innerHTML = '';
         Object.values(territories).forEach(territory => {
             const territoryDiv = document.createElement('div');
             territoryDiv.className = 'territory';
@@ -215,8 +220,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const owner = playerData.find(p => p.id === territory.owner);
                 if (owner) {
                     const house = getHouseFromName(owner.name);
+                    console.log(`Territory ${territory.id}:`, {
+                        owner: owner.name,
+                        house: house,
+                        isMyTerritory: territory.owner === playerId,
+                        playerName: playerName,
+                        classes: territoryDiv.className
+                    });
                     if (house) {
                         territoryDiv.classList.add(`house-${house.toLowerCase()}`);
+                        console.log(`Added house class: house-${house.toLowerCase()}`);
                     }
                 }
                 // Add my-territory class if owned by current player
@@ -230,6 +243,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             territoryDiv.addEventListener('click', () => handleTerritoryClick(territory.id));
             mapContainerEl.appendChild(territoryDiv);
+            // Debug final classes
+            console.log(`Final classes for territory ${territory.id}:`, territoryDiv.className);
         });
     }
     function handleTerritoryClick(territoryId) {
