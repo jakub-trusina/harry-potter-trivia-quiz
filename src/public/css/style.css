@@ -24,10 +24,11 @@ body {
     background-color: var(--background-dark);
     color: var(--text-primary);
     min-height: 100vh;
-    background-image: url('../img/background.jpeg');
+    background-image: url('../img/hogwarts_bg.jpg');
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
+    background-repeat: no-repeat;
 }
 
 .container {
@@ -173,7 +174,7 @@ input[type="text"] {
     grid-template-rows: repeat(6, 1fr);
     gap: 5px;
     padding: 10px;
-    background: url('../img/hogwarts-map.png') no-repeat center center;
+    background: url('../img/hogwarts_map.jpg') no-repeat center center;
     background-size: cover;
     position: relative;
     min-height: 400px;
@@ -263,56 +264,90 @@ input[type="text"] {
 /* Territory styling */
 .territory {
     position: relative;
-    background-color: rgba(50, 50, 50, 0.7);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 5px;
+    width: 100%;
+    height: 100%;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
     display: flex;
     justify-content: center;
     align-items: center;
-    transition: all 0.2s ease;
+    background-color: rgba(50, 50, 50, 0.7);
 }
 
-.territory.attackable {
-    cursor: pointer;
-    box-shadow: 0 0 10px gold;
-    animation: pulseBorder 1.5s infinite;
+.territory:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(211, 166, 37, 0.5);
+    z-index: 2;
 }
 
-@keyframes pulseBorder {
-    0%, 100% { border-color: rgba(255, 255, 255, 0.3); }
-    50% { border-color: gold; }
-}
-
-.territory.my-territory {
-    box-shadow: 0 0 5px 2px gold;
-}
-
-.territory-value {
-    font-size: 24px;
-    font-weight: bold;
-    color: white;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-}
-
-/* House-specific styling */
-.territory.house-gryffindor, .player-stat.house-gryffindor {
-    background-color: rgba(116, 0, 1, 0.7);
+/* House-specific territory styling */
+.territory.house-gryffindor {
+    background-color: rgba(116, 0, 1, 0.85);  /* Gryffindor red with more opacity */
     border-color: var(--gryffindor-gold);
 }
 
-.territory.house-slytherin, .player-stat.house-slytherin {
-    background-color: rgba(26, 71, 42, 0.7);
+.territory.house-slytherin {
+    background-color: rgba(26, 71, 42, 0.85);  /* Slytherin green with more opacity */
     border-color: var(--slytherin-silver);
 }
 
-.territory.house-ravenclaw, .player-stat.house-ravenclaw {
-    background-color: rgba(14, 26, 64, 0.7);
+.territory.house-ravenclaw {
+    background-color: rgba(14, 26, 64, 0.85);  /* Ravenclaw blue with more opacity */
     border-color: var(--ravenclaw-bronze);
 }
 
-.territory.house-hufflepuff, .player-stat.house-hufflepuff {
-    background-color: rgba(255, 216, 0, 0.7);
+.territory.house-hufflepuff {
+    background-color: rgba(255, 216, 0, 0.85);  /* Hufflepuff yellow with more opacity */
     border-color: var(--hufflepuff-black);
+}
+
+.territory.my-territory {
+    border-width: 4px;
+    border-color: white;
+}
+
+/* Capitol styling */
+.territory.capitol {
+    border-width: 5px;
+    border-style: double;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+.territory.house-gryffindor.capitol {
+    box-shadow: 0 0 20px var(--gryffindor-gold);
+}
+
+.territory.house-slytherin.capitol {
+    box-shadow: 0 0 20px var(--slytherin-silver);
+}
+
+.territory.house-ravenclaw.capitol {
+    box-shadow: 0 0 20px var(--ravenclaw-bronze);
+}
+
+.territory.house-hufflepuff.capitol {
+    box-shadow: 0 0 20px var(--hufflepuff-yellow);
+}
+
+.territory.attackable {
+    animation: pulseBorder 2s infinite;
+    cursor: crosshair;
+}
+
+@keyframes pulseBorder {
+    0% { border-color: rgba(255, 0, 0, 0.6); }
+    50% { border-color: rgba(255, 0, 0, 1); }
+    100% { border-color: rgba(255, 0, 0, 0.6); }
+}
+
+.territory-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: white;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    z-index: 1;
 }
 
 /* Quiz styling */
@@ -409,6 +444,91 @@ input[type="text"] {
     border: 1px solid var(--ravenclaw-bronze);
 }
 
+/* Question dialog styling */
+.question-dialog {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.95);
+    border: 3px solid var(--gryffindor-gold);
+    border-radius: 15px;
+    padding: 20px;
+    z-index: 1000;
+    min-width: 400px;
+    color: white;
+}
+
+.question-dialog .question {
+    font-size: 1.2rem;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.question-dialog .answers {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.question-dialog .answer-button {
+    padding: 10px;
+    border: 2px solid var(--gryffindor-gold);
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.question-dialog .answer-button:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.question-dialog .answer-button.selected {
+    background-color: var(--gryffindor-gold);
+    color: black;
+}
+
+.question-dialog .answer-button.correct {
+    background-color: rgba(26, 71, 42, 0.9);  /* Slytherin green */
+    border-color: var(--hufflepuff-yellow);
+    color: white;
+}
+
+.question-dialog .answer-button.incorrect {
+    background-color: rgba(116, 0, 1, 0.9);  /* Gryffindor red */
+    border-color: white;
+    color: white;
+}
+
+.question-dialog .answer-button:disabled {
+    opacity: 0.8;
+    cursor: not-allowed;
+}
+
+.question-dialog .timer {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 1.2rem;
+    color: var(--gryffindor-gold);
+}
+
+.question-dialog .result {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 1.2rem;
+}
+
+.question-dialog .correct {
+    color: #4CAF50;
+}
+
+.question-dialog .incorrect {
+    color: #f44336;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .game-board {
@@ -424,4 +544,18 @@ input[type="text"] {
     #answers-container {
         grid-template-columns: 1fr;
     }
+}
+
+.turn-indicator {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    padding: 10px 20px;
+    border-radius: 20px;
+    border: 2px solid var(--gryffindor-gold);
+    color: white;
+    font-size: 1.2rem;
+    z-index: 10;
 } 

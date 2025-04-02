@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ES2020",
+    "outDir": "./dist/public/js",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "moduleResolution": "node"
+  },
+  "include": ["src/game.ts", "src/types/**/*", "src/utils/**/*"],
+  "exclude": ["src/server.ts", "node_modules", "dist"]
+} 
