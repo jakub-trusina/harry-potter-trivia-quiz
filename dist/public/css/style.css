@@ -136,13 +136,42 @@ input[type="text"] {
 }
 
 #player-list li {
-    padding: 8px;
-    border-bottom: 1px solid var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    margin-bottom: 8px;
+    background-color: rgba(0, 0, 0, 0.5);
+    border-radius: 5px;
+    border: 1px solid var(--gryffindor-gold);
 }
 
 #player-list .current-player {
-    color: var(--gryffindor-gold);
+    background-color: rgba(211, 166, 37, 0.2);
+    border-color: var(--gryffindor-gold);
+    box-shadow: 0 0 10px rgba(211, 166, 37, 0.3);
+}
+
+#player-list .player-name {
+    font-size: 1.1em;
     font-weight: bold;
+    color: var(--gryffindor-gold);
+    margin-bottom: 4px;
+}
+
+#player-list .player-house {
+    font-size: 0.9em;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+#player-list .player-score {
+    font-size: 0.9em;
+    color: var(--text-secondary);
+}
+
+#player-list .territory-count {
+    font-size: 0.9em;
+    color: var(--text-secondary);
 }
 
 .waiting-text {
@@ -236,6 +265,7 @@ input[type="text"] {
 
 /* Capitol styling */
 .territory.capitol {
+    position: relative;
     border-width: 5px;
     border-style: double;
 }
@@ -452,6 +482,15 @@ input[type="text"] {
 
 .question-dialog .incorrect {
     color: #f44336;
+}
+
+.question-dialog .round-indicator {
+    font-size: 1.2em;
+    color: #ffd700;
+    text-align: center;
+    margin: 10px 0;
+    font-weight: bold;
+    text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
 }
 
 /* Responsive adjustments */
@@ -684,4 +723,58 @@ input[type="text"] {
     background: rgba(0, 0, 0, 0.9);
     font-weight: bold;
     text-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+}
+
+.territory.capitol::before {
+    content: '⚔️⚔️';
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    font-size: 1.2em;
+    z-index: 2;
+    text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+    letter-spacing: 2px;
+}
+
+.territory.capitol[data-shields="1"]::before {
+    content: '⚔️';
+    letter-spacing: 0;
+}
+
+.territory.capitol[data-shields="0"]::before,
+.territory.capitol[data-shields="-1"]::before {
+    content: '';
+}
+
+.territory.capitol[data-shields="-1"] {
+    border-style: dashed;
+    border-width: 2px;
+    opacity: 0.8;
+}
+
+.territory.capitol[data-shields="-1"]::after {
+    content: '⚠️';
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 1.2em;
+}
+
+.territory.disconnected {
+    opacity: 0.7;
+    border-style: dashed;
+    border-width: 2px;
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+.territory.disconnected::after {
+    content: '⚠️';
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 1.2em;
+}
+
+.territory.disconnected:hover {
+    opacity: 1;
 } 

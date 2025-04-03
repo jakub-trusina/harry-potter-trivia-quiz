@@ -170,14 +170,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Game functions
     function updatePlayerList(): void {
         console.log('🔄 Updating player list display');
+        const playerList = document.getElementById('player-list');
         if (!playerList) return;
+
         playerList.innerHTML = '';
         playerData.forEach(player => {
             const li = document.createElement('li');
-            li.textContent = player.name;
-            if (player.id === playerId) {
-                li.classList.add('current-player');
-            }
+            li.className = player.id === gameState.currentTurn ? 'current-player' : '';
+            li.innerHTML = `
+                <span class="player-name">${player.name}</span>
+                ${gameActive ? `<span class="player-house">${player.house}</span>` : ''}
+                <span class="player-score">Score: ${player.score}</span>
+                <span class="territory-count">Territories: ${player.territories.length}</span>
+            `;
             playerList.appendChild(li);
         });
     }
@@ -186,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!startGameBtn) return;
         const canStart = playerData.length >= 2 && playerData.length <= 4;
         startGameBtn.disabled = !canStart;
-        console.log(`�� Start button ${canStart ? 'enabled' : 'disabled'} (${playerData.length} players)`);
+        console.log(`🔄 Start button ${canStart ? 'enabled' : 'disabled'} (${playerData.length} players)`);
     }
 
     function updatePlayerStats(): void {
@@ -195,9 +200,8 @@ document.addEventListener('DOMContentLoaded', () => {
         playerData.forEach(player => {
             const div = document.createElement('div');
             div.className = 'player-stat';
-            const house = getHouseFromName(player.name);
-            if (house) {
-                div.classList.add(`house-${house}`);
+            if (player.house) {  // Only add house class if house is assigned
+                div.classList.add(`house-${player.house.toLowerCase()}`);
             }
             div.innerHTML = `
                 <span class="player-name">${player.name}</span>
@@ -245,11 +249,20 @@ document.addEventListener('DOMContentLoaded', () => {
         
         Object.values(territories).forEach(territory => {
             const territoryDiv = document.createElement('div');
-            territoryDiv.className = 'territory';
+            territoryDiv.className = 'territory player-territory';
             territoryDiv.dataset.id = territory.id;
             
             if (territory.isCapitol) {
                 territoryDiv.classList.add('capitol');
+                territoryDiv.dataset.shields = territory.shields?.toString() || '0';
+            }
+            
+            // Add supply line status
+            if (territory.owner === playerId) {
+                if (!territory.hasSupplyLine) {
+                    territoryDiv.classList.add('disconnected');
+                    territoryDiv.title = 'This territory is disconnected from your capitol. You cannot attack from here.';
+                }
             }
             
             const valueElement = document.createElement('div');
@@ -263,36 +276,23 @@ document.addEventListener('DOMContentLoaded', () => {
             // Apply territory ownership styling
             if (territory.owner) {
                 const owner = playerData.find(p => p.id === territory.owner);
-                if (owner) {
-                    const house = getHouseFromName(owner.name);
-                    console.log(`Territory ${territory.id}:`, {
-                        owner: owner.name,
-                        house: house,
-                        isMyTerritory: territory.owner === playerId,
-                        playerName: playerName,
-                        classes: territoryDiv.className
-                    });
-                    
-                    if (house) {
-                        territoryDiv.classList.add(`house-${house.toLowerCase()}`);
-                        console.log(`Added house class: house-${house.toLowerCase()}`);
-                    }
+                if (owner?.house) {  // Only add house class if house is assigned
+                    territoryDiv.classList.add(`house-${owner.house.toLowerCase()}`);
+                    console.log(`Added house class: house-${owner.house.toLowerCase()}`);
                 }
-                
                 // Add my-territory class if owned by current player
                 if (territory.owner === playerId) {
                     territoryDiv.classList.add('my-territory');
                 }
-                
-                // Only add attackable class if it's the player's turn and they have territories
-                if (gameState.currentTurn === playerId && canAttackTerritory(territory.id)) {
-                    territoryDiv.classList.add('attackable');
-                }
+            }
+            
+            // Add attackable class if it's the player's turn and they can attack this territory
+            if (gameState.currentTurn === playerId && canAttackTerritory(territory.id)) {
+                territoryDiv.classList.add('attackable');
             }
             
             territoryDiv.addEventListener('click', () => handleTerritoryClick(territory.id));
             mapContainerEl.appendChild(territoryDiv);
-            
             // Debug final classes
             console.log(`Final classes for territory ${territory.id}:`, territoryDiv.className);
         });
@@ -334,6 +334,29 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Check if the territory is adjacent to any connected territory
+        const [tx, ty] = territory.id.split('-').map(Number);
+        const hasAdjacentConnectedTerritory = Object.values(territoryData).some(t => {
+            if (t.owner !== playerId) return false;
+            const [x, y] = t.id.split('-').map(Number);
+            const dx = Math.abs(x - tx);
+            const dy = Math.abs(y - ty);
+            return ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) && t.hasSupplyLine;
+        });
+
+        if (!hasAdjacentConnectedTerritory) {
+            if (logEntries) {
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                entry.innerHTML = `
+                    <span class="log-timestamp">${new Date().toLocaleTimeString()}</span>
+                    <span>You need to connect this territory to your capitol before attacking from here!</span>
+                `;
+                logEntries.insertBefore(entry, logEntries.firstChild);
+            }
+            return;
+        }
+
         if (canAttackTerritory(territoryId)) {
             console.log(`🗡️ Attacking territory ${territoryId}`);
             if (logEntries) {
@@ -353,7 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 entry.className = 'log-entry';
                 entry.innerHTML = `
                     <span class="log-timestamp">${new Date().toLocaleTimeString()}</span>
-                    <span>Cannot attack this territory - it must be adjacent to one of yours!</span>
+                    <span>Cannot attack this territory - it must be adjacent to one of your connected territories!</span>
                 `;
                 logEntries.insertBefore(entry, logEntries.firstChild);
             }
@@ -369,16 +392,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (territory.owner === playerId) return false;
         }
 
-        // Check if the territory is adjacent to any of the player's territories
+        // Check if the territory is adjacent to any of the player's territories with supply lines
         const [tx, ty] = territory.id.split('-').map(Number);
         
-        return Object.values(territoryData).some(t => {
+        // Find adjacent territories owned by the player
+        const adjacentTerritories = Object.values(territoryData).filter(t => {
             if (t.owner !== playerId) return false;
             const [x, y] = t.id.split('-').map(Number);
             const dx = Math.abs(x - tx);
             const dy = Math.abs(y - ty);
-            return (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+            return ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) && t.hasSupplyLine;
         });
+
+        // If any adjacent territory has a supply line, we can attack
+        return adjacentTerritories.length > 0;
     }
 
     // Add game-start event handler
@@ -456,7 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    function showQuestionDialog(question: Question, role: 'attacker' | 'defender'): void {
+    function showQuestionDialog(question: Question, role: 'attacker' | 'defender', round: number = 0): void {
         const dialog = document.createElement('div');
         dialog.className = 'question-dialog';
         
@@ -468,6 +495,14 @@ document.addEventListener('DOMContentLoaded', () => {
         questionText.className = 'question';
         questionText.textContent = question.question;
         dialog.appendChild(questionText);
+
+        // Add round indicator for capitol attacks
+        if (round > 0) {
+            const roundIndicator = document.createElement('div');
+            roundIndicator.className = 'round-indicator';
+            roundIndicator.textContent = `Shield Round ${round}/3`;
+            dialog.appendChild(roundIndicator);
+        }
 
         const answersDiv = document.createElement('div');
         answersDiv.className = 'answers';

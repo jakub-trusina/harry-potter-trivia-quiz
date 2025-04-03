@@ -5,6 +5,8 @@ export interface Territory {
     owner: string | null;
     value: number;
     isCapitol: boolean;
+    shields?: number;
+    hasSupplyLine?: boolean;
 }
 export interface Player {
     id: string;
@@ -12,6 +14,7 @@ export interface Player {
     territories: string[];
     score: number;
     eliminated: boolean;
+    house?: 'Gryffindor' | 'Slytherin' | 'Ravenclaw' | 'Hufflepuff';
 }
 export interface Question {
     id: string;
@@ -25,7 +28,7 @@ export interface Question {
 export interface DuelResult {
     winner: 'attacker' | 'defender' | null;
     attackerId: string;
-    defenderId: string | null;
+    defenderId: string;
     attackerCorrect: boolean;
     defenderCorrect: boolean;
     attackerTime: number;
@@ -34,9 +37,10 @@ export interface DuelResult {
     defenderAnswer?: number;
     correctAnswer: number;
     answerText: string;
-    reason?: string;
-    continuingAttack?: boolean;
-    defenseReduced?: boolean;
+    round: number;
+    shieldsRemaining: number;
+    continuing?: boolean;
+    unclaimedTerritory?: boolean;
 }
 export interface GameState {
     territories: {
