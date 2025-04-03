@@ -578,4 +578,110 @@ input[type="text"] {
     color: white;
     font-size: 1.2rem;
     text-align: center;
+}
+
+.game-end-message {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.95);
+    border: 3px solid var(--gryffindor-gold);
+    border-radius: 15px;
+    padding: 30px;
+    color: white;
+    text-align: center;
+    z-index: 1000;
+    min-width: 400px;
+    max-width: 600px;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+}
+
+.game-end-message h2 {
+    color: var(--gryffindor-gold);
+    margin-bottom: 20px;
+    font-size: 2em;
+}
+
+.game-end-message .winners {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 30px;
+}
+
+.game-end-message .winner-section {
+    padding: 15px;
+    border: 2px solid var(--gryffindor-gold);
+    border-radius: 10px;
+    min-width: 200px;
+}
+
+.game-end-message .winner-section h3 {
+    color: var(--gryffindor-gold);
+    margin-bottom: 10px;
+}
+
+.game-end-message .final-scores {
+    margin: 20px 0;
+    padding: 15px;
+    border: 2px solid var(--gryffindor-gold);
+    border-radius: 10px;
+}
+
+.game-end-message .final-scores h3 {
+    color: var(--gryffindor-gold);
+    margin-bottom: 15px;
+}
+
+.game-end-message ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.game-end-message li {
+    margin: 8px 0;
+    font-size: 1.1em;
+}
+
+.game-end-message button {
+    background: var(--gryffindor-gold);
+    color: var(--gryffindor-red);
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-size: 1.1em;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: all 0.3s ease;
+}
+
+.game-end-message button:hover {
+    background: var(--gryffindor-red);
+    color: var(--gryffindor-gold);
+    transform: scale(1.05);
+}
+
+#turn-indicator {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: var(--gryffindor-gold);
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-size: 1.2em;
+    z-index: 100;
+    border: 2px solid var(--gryffindor-gold);
+    text-align: center;
+    min-width: 200px;
+}
+
+#turn-indicator.defeated {
+    color: #ff4444;
+    border-color: #ff4444;
+    background: rgba(0, 0, 0, 0.9);
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
 } 

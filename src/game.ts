@@ -297,7 +297,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!territory) return;
 
         const logEntries = document.getElementById('log-entries');
+        const currentPlayer = playerData.find(p => p.id === playerId);
         
+        // Check if player is defeated (has no territories)
+        if (currentPlayer && currentPlayer.territories.length === 0) {
+            if (logEntries) {
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                entry.innerHTML = `
+                    <span class="log-timestamp">${new Date().toLocaleTimeString()}</span>
+                    <span>You were defeated. You can't attack since you don't have any region.</span>
+                `;
+                logEntries.insertBefore(entry, logEntries.firstChild);
+            }
+            return;
+        }
+
         if (gameState.currentTurn !== playerId) {
             if (logEntries) {
                 const entry = document.createElement('div');
@@ -371,7 +386,26 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('game-screen')?.classList.remove('hidden');
     });
 
-    // Add game state update handler
+    // Add function to update turn indicator
+    function updateTurnIndicator(): void {
+        const turnIndicator = document.getElementById('turn-indicator');
+        if (!turnIndicator) return;
+
+        const currentPlayer = playerData.find(p => p.id === playerId);
+        if (currentPlayer && currentPlayer.territories.length === 0) {
+            turnIndicator.textContent = "You've lost all regions, you are defeated.";
+            turnIndicator.classList.add('defeated');
+        } else if (gameState.currentTurn === playerId) {
+            turnIndicator.textContent = "Your Turn";
+            turnIndicator.classList.remove('defeated');
+        } else {
+            const currentTurnPlayer = playerData.find(p => p.id === gameState.currentTurn);
+            turnIndicator.textContent = `${currentTurnPlayer?.name}'s Turn`;
+            turnIndicator.classList.remove('defeated');
+        }
+    }
+
+    // Update the game state update handler to call updateTurnIndicator
     socket.on('game-state-update', (data: { territories: { [key: string]: Territory }; players: Player[]; currentTurn: string }) => {
         console.log('🔄 Received game state update:', data);
         territoryData = data.territories;
@@ -380,6 +414,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.currentTurn = data.currentTurn;
         createMap(data.territories);
         updatePlayerStats();
+        updateTurnIndicator();
     });
 
     // Add the event listener for territory debugging
@@ -437,7 +472,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.appendChild(dialog);
 
         // First timer for reading the question (3 seconds)
-        let timeLeft = 3;
+        let timeLeft = 4;
         timer.textContent = timeLeft.toString();
         
         const readingInterval = setInterval(() => {
@@ -519,24 +554,71 @@ document.addEventListener('DOMContentLoaded', () => {
         const resultDiv = dialog.querySelector('.result');
         if (!resultDiv) return;
 
+        // Get player names
+        const attacker = playerData.find(p => p.id === result.attackerId);
+        const defender = playerData.find(p => p.id === result.defenderId);
+
         // Show who won and the correct answer
         resultDiv.innerHTML = `
             <div>Correct answer: ${result.answerText}</div>
             <div class="${result.attackerCorrect ? 'correct' : 'incorrect'}">
-                Attacker: ${result.attackerCorrect ? 'Correct' : 'Incorrect'}
+                ${attacker?.name}: ${result.attackerCorrect ? 'Correct' : 'Incorrect'}
             </div>
             ${result.defenderCorrect !== undefined ? `
                 <div class="${result.defenderCorrect ? 'correct' : 'incorrect'}">
-                    Defender: ${result.defenderCorrect ? 'Correct' : 'Incorrect'}
+                    ${defender?.name}: ${result.defenderCorrect ? 'Correct' : 'Incorrect'}
                 </div>
             ` : ''}
-            <div>Winner: ${result.winner === 'attacker' ? 'Attacker' : 
-                          result.winner === 'defender' ? 'Defender' : 'No one'}</div>
+            <div>Winner: ${result.winner === 'attacker' ? attacker?.name : 
+                                   result.winner === 'defender' ? defender?.name : 'No one'}</div>
         `;
 
-        // Remove the dialog after 2 seconds
+        // Remove the dialog after 4 seconds
         setTimeout(() => {
             dialog.remove();
-        }, 2000);
+        }, 4000);
+    });
+
+    socket.on('game-end', (data: { 
+        winner: string;
+        winnerName: string;
+        reason: string;
+        finalScores: Array<{ name: string; score: number }>;
+    }) => {
+        const gameScreen = document.getElementById('game-screen');
+        if (!gameScreen) return;
+
+        // Find the highest score
+        const highestScore = Math.max(...data.finalScores.map(p => p.score));
+        const highestScorePlayers = data.finalScores.filter(p => p.score === highestScore);
+
+        // Create the game end message
+        const message = document.createElement('div');
+        message.className = 'game-end-message';
+        message.innerHTML = `
+            <h2>Game Over!</h2>
+            <div class="winners">
+                <div class="winner-section">
+                    <h3>Last Man Standing</h3>
+                    <p>${data.winnerName}</p>
+                </div>
+                <div class="winner-section">
+                    <h3>Highest Score</h3>
+                    <p>${highestScorePlayers.map(p => p.name).join(', ')} (${highestScore} points)</p>
+                </div>
+            </div>
+            <div class="final-scores">
+                <h3>Final Scores</h3>
+                <ul>
+                    ${data.finalScores.map(p => `
+                        <li>${p.name}: ${p.score} points</li>
+                    `).join('')}
+                </ul>
+            </div>
+            <button onclick="location.reload()">Play Again</button>
+        `;
+
+        // Add the message to the game screen
+        gameScreen.appendChild(message);
     });
 }); 

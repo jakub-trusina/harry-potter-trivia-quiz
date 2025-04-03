@@ -85,12 +85,20 @@ function processDuelResult(territoryId: string): void {
     result.attackerCorrect = attackerAnswer?.answer === question.correctAnswer;
     result.defenderCorrect = defenderAnswer?.answer === question.correctAnswer;
 
-    // Determine winner
+    // Update scores based on correct answers
+    if (result.attackerCorrect) {
+        attackingPlayer.score += territory.value;
+    }
+    if (result.defenderCorrect) {
+        defendingPlayer.score += territory.value;
+    }
+
+    // Determine territory winner (for territory control only)
     if (result.attackerCorrect) {
         if (!result.defenderCorrect) {
             result.winner = 'attacker';
         } else {
-            // Both correct, faster response wins
+            // Both correct, faster response wins territory
             result.winner = (result.attackerTime <= (result.defenderTime || 15)) ? 'attacker' : 'defender';
         }
     } else if (result.defenderCorrect) {
@@ -103,17 +111,49 @@ function processDuelResult(territoryId: string): void {
         attackingPlayer.territories.push(territoryId);
         defendingPlayer.territories = defendingPlayer.territories.filter(t => t !== territoryId);
 
-        // Update scores
-        attackingPlayer.score += territory.value;
+        // If the captured territory is a capitol, eliminate the defender
         if (territory.isCapitol) {
-            attackingPlayer.score += 2;  // Bonus for capturing a capitol
+            // Transfer all defender's territories to the attacker
+            defendingPlayer.territories.forEach(tId => {
+                const t = gameState.territories[tId];
+                if (t) {
+                    t.owner = attackerId;
+                    attackingPlayer.territories.push(tId);
+                }
+            });
+            defendingPlayer.territories = []; // Clear defender's territories
         }
     }
 
     // Move to next player's turn
     const currentPlayerIndex = gameState.players.findIndex(p => p.id === attackerId);
-    const nextPlayerIndex = (currentPlayerIndex + 1) % gameState.players.length;
+    let nextPlayerIndex = (currentPlayerIndex + 1) % gameState.players.length;
+    
+    // Skip eliminated players when finding next turn
+    while (gameState.players[nextPlayerIndex].territories.length === 0) {
+        nextPlayerIndex = (nextPlayerIndex + 1) % gameState.players.length;
+        // If we've gone through all players and found none with territories, break
+        if (nextPlayerIndex === currentPlayerIndex) break;
+    }
+    
     gameState.currentTurn = gameState.players[nextPlayerIndex].id;
+
+    // Check for game end conditions
+    const activePlayers = gameState.players.filter(p => p.territories.length > 0);
+    if (activePlayers.length === 1) {
+        // Last man standing wins
+        const winner = activePlayers[0];
+        io.emit('game-end', {
+            winner: winner.id,
+            winnerName: winner.name,
+            reason: 'last-man-standing',
+            finalScores: gameState.players.map(p => ({
+                name: p.name,
+                score: p.score
+            }))
+        });
+        gameState.gameActive = false;
+    }
 
     // Emit results and update game state
     io.emit('duel-result', result);
