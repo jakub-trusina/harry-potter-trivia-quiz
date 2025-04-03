@@ -245,10 +245,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (territory.owner === playerId) {
                     territoryDiv.classList.add('my-territory');
                 }
-                // Only add attackable class if it's the player's turn and they have territories
-                if (gameState.currentTurn === playerId && canAttackTerritory(territory.id)) {
-                    territoryDiv.classList.add('attackable');
-                }
+            }
+            // Add attackable class if it's the player's turn and they can attack this territory
+            if (gameState.currentTurn === playerId && canAttackTerritory(territory.id)) {
+                territoryDiv.classList.add('attackable');
             }
             territoryDiv.addEventListener('click', () => handleTerritoryClick(territory.id));
             mapContainerEl.appendChild(territoryDiv);
@@ -346,7 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (territory.owner === playerId)
                 return false;
         }
-        // Check if the territory is adjacent to any of the player's territories
+        // Check if the territory is adjacent to any of the player's territories with supply lines
         const [tx, ty] = territory.id.split('-').map(Number);
         // Find adjacent territories owned by the player
         const adjacentTerritories = Object.values(territoryData).filter(t => {
@@ -355,10 +355,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const [x, y] = t.id.split('-').map(Number);
             const dx = Math.abs(x - tx);
             const dy = Math.abs(y - ty);
-            return (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+            return ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) && t.hasSupplyLine;
         });
         // If any adjacent territory has a supply line, we can attack
-        return adjacentTerritories.some(t => t.hasSupplyLine);
+        return adjacentTerritories.length > 0;
     }
     // Add game-start event handler
     socket.on('game-start', (data) => {
@@ -580,6 +580,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add the message to the game screen
         gameScreen.appendChild(message);
     });
+    function addLogEntry(message) {
+        const logEntries = document.getElementById('log-entries');
+        if (logEntries) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `
+                <span class="log-timestamp">${new Date().toLocaleTimeString()}</span>
+                <span>${message}</span>
+            `;
+            logEntries.appendChild(entry);
+            // Scroll to bottom
+            logEntries.scrollTop = logEntries.scrollHeight;
+        }
+    }
 });
 export {};
 //# sourceMappingURL=game.js.map

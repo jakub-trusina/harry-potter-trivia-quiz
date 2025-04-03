@@ -76,6 +76,10 @@ function checkSupplyLine(territoryId, playerId) {
         const adjacent = getAdjacentTerritories(x, y, 6);
         queue.push(...adjacent);
     }
+    // If we've searched all territories and found no path to a capitol,
+    // and this territory is a capitol, it should have a supply line
+    if (territory.isCapitol)
+        return true;
     return false;
 }
 // Update supply lines for all territories of a player
@@ -673,8 +677,15 @@ io.on('connection', (socket) => {
         else if (socket.id === duelData.defenderId) {
             duelData.defenderAnswer = answer;
         }
-        // If both players have answered or time is up, process the result
-        if (duelData.attackerAnswer && duelData.defenderAnswer) {
+        // For unclaimed territories, process immediately after attacker answers
+        if (!duelData.defenderId && duelData.attackerAnswer) {
+            if (duelData.timeoutId) {
+                clearTimeout(duelData.timeoutId);
+            }
+            processDuelResult(territoryId);
+        }
+        // For normal duels, wait for both answers or timeout
+        else if (duelData.attackerAnswer && duelData.defenderAnswer) {
             if (duelData.timeoutId) {
                 clearTimeout(duelData.timeoutId);
             }
