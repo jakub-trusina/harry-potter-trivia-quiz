@@ -18,6 +18,7 @@ export interface Question {
     question: string;
     answers: string[];
     correctAnswer: number;
+    difficulty: 'easy' | 'medium' | 'hard';
     continuing?: boolean;
     round?: number;
 }

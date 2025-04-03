@@ -30,8 +30,17 @@ const gameState = {
 const questions = JSON.parse(readFileSync(path.join(projectRoot, 'src', 'data', 'questions.json'), 'utf-8'));
 // Active duels map: territoryId -> { attackerId, defenderId, question, answers }
 const activeQuestions = new Map();
-function getRandomQuestion() {
-    return questions[Math.floor(Math.random() * questions.length)];
+function getRandomQuestion(territoryValue) {
+    // Filter questions based on territory value
+    const difficulty = territoryValue === 3 ? 'hard' :
+        territoryValue === 2 ? 'medium' : 'easy';
+    const filteredQuestions = questions.filter(q => q.difficulty === difficulty);
+    // If no questions found for the difficulty, fall back to any question
+    if (filteredQuestions.length === 0) {
+        console.warn(`No questions found for difficulty ${difficulty}, falling back to any question`);
+        return questions[Math.floor(Math.random() * questions.length)];
+    }
+    return filteredQuestions[Math.floor(Math.random() * filteredQuestions.length)];
 }
 function processDuelResult(territoryId) {
     const duel = activeQuestions.get(territoryId);
@@ -379,7 +388,7 @@ io.on('connection', (socket) => {
             return;
         }
         // Start a new duel
-        const question = getRandomQuestion();
+        const question = getRandomQuestion(territory.value);
         activeQuestions.set(territoryId, {
             attackerId: socket.id,
             defenderId: territory.owner,

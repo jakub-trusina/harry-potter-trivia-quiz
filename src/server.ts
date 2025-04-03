@@ -49,8 +49,20 @@ const activeQuestions: Map<string, {
     timeoutId?: NodeJS.Timeout;
 }> = new Map();
 
-function getRandomQuestion(): Question {
-    return questions[Math.floor(Math.random() * questions.length)];
+function getRandomQuestion(territoryValue: number): Question {
+    // Filter questions based on territory value
+    const difficulty = territoryValue === 3 ? 'hard' : 
+                      territoryValue === 2 ? 'medium' : 'easy';
+    
+    const filteredQuestions = questions.filter(q => q.difficulty === difficulty);
+    
+    // If no questions found for the difficulty, fall back to any question
+    if (filteredQuestions.length === 0) {
+        console.warn(`No questions found for difficulty ${difficulty}, falling back to any question`);
+        return questions[Math.floor(Math.random() * questions.length)];
+    }
+    
+    return filteredQuestions[Math.floor(Math.random() * filteredQuestions.length)];
 }
 
 function processDuelResult(territoryId: string): void {
@@ -310,7 +322,8 @@ function distributeTerritories(): void {
             const territory = gameState.territories[tId];
             territory.owner = player.id;
             if (!territory.isCapitol) {
-                territory.value = Math.floor(Math.random() * 2) + 1;
+                // Random value between 1 and 3 for non-capitol territories
+                territory.value = Math.floor(Math.random() * 3) + 1;
             }
             player.territories.push(tId);
         });
@@ -337,7 +350,8 @@ function distributeTerritories(): void {
 
             const territory = gameState.territories[tId];
             territory.owner = closestPlayer.id;
-            territory.value = Math.floor(Math.random() * 2) + 1;
+            // Random value between 1 and 3 for remaining territories
+            territory.value = Math.floor(Math.random() * 3) + 1;
             closestPlayer.territories.push(tId);
         });
     }
@@ -443,7 +457,7 @@ io.on('connection', (socket) => {
         }
 
         // Start a new duel
-        const question = getRandomQuestion();
+        const question = getRandomQuestion(territory.value);
         activeQuestions.set(territoryId, {
             attackerId: socket.id,
             defenderId: territory.owner,

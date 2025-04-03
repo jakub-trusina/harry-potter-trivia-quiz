@@ -227,10 +227,18 @@ document.addEventListener('DOMContentLoaded', () => {
             gameScreen?.insertBefore(turnIndicator, gameScreen.firstChild);
         }
         
-        const currentPlayer = playerData.find(p => p.id === gameState.currentTurn);
-        turnIndicator.textContent = currentPlayer?.id === playerId ? 
-            "Your turn!" : 
-            `${currentPlayer?.name}'s turn`;
+        // Update turn indicator based on player status
+        const currentPlayer = playerData.find(p => p.id === playerId);
+        if (currentPlayer && currentPlayer.territories.length === 0) {
+            turnIndicator.textContent = "You've lost all regions, you are defeated.";
+            turnIndicator.classList.add('defeated');
+        } else {
+            const currentTurnPlayer = playerData.find(p => p.id === gameState.currentTurn);
+            turnIndicator.textContent = currentTurnPlayer?.id === playerId ? 
+                "Your turn!" : 
+                `${currentTurnPlayer?.name}'s turn`;
+            turnIndicator.classList.remove('defeated');
+        }
         
         // Clear and recreate map
         mapContainerEl.innerHTML = '';
@@ -276,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     territoryDiv.classList.add('my-territory');
                 }
                 
-                // Only add attackable class if it's the player's turn
+                // Only add attackable class if it's the player's turn and they have territories
                 if (gameState.currentTurn === playerId && canAttackTerritory(territory.id)) {
                     territoryDiv.classList.add('attackable');
                 }
