@@ -63,6 +63,26 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('❌ Could not find new game button element');
         return;
     }
+    // Help modal functionality
+    const helpModal = document.getElementById('help-modal');
+    const helpButtons = document.querySelectorAll('.help-button');
+    const closeHelpButton = document.querySelector('.close-help');
+    if (helpModal && helpButtons && closeHelpButton) {
+        helpButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                helpModal.classList.remove('hidden');
+            });
+        });
+        closeHelpButton.addEventListener('click', () => {
+            helpModal.classList.add('hidden');
+        });
+        // Close modal when clicking outside
+        helpModal.addEventListener('click', (e) => {
+            if (e.target === helpModal) {
+                helpModal.classList.add('hidden');
+            }
+        });
+    }
     // Initialize Socket.IO after DOM elements are verified
     try {
         console.log('🔌 Initializing Socket.IO connection...');

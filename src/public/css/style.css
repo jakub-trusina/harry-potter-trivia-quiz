@@ -784,4 +784,98 @@ input[type="text"] {
 
 .territory.disconnected:hover {
     opacity: 1;
+}
+
+/* Help button styling */
+.help-button {
+    background-color: var(--gryffindor-gold);
+    color: var(--gryffindor-red);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--gryffindor-red);
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    padding: 0;
+    line-height: 1;
+}
+
+.help-button:hover {
+    background-color: var(--gryffindor-red);
+    color: var(--gryffindor-gold);
+    transform: scale(1.1);
+}
+
+.card-header, .stats-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding: 0 10px;
+}
+
+.card-header h2, .stats-header h3 {
+    margin-bottom: 0;
+}
+
+/* Help modal styling */
+.help-content {
+    background: rgba(0, 0, 0, 0.95);
+    border: 3px solid var(--gryffindor-gold);
+    border-radius: 15px;
+    padding: 30px;
+    max-width: 800px;
+    max-height: 80vh;
+    overflow-y: auto;
+    color: white;
+}
+
+.help-content h2 {
+    text-align: center;
+    margin-bottom: 30px;
+    color: var(--gryffindor-gold);
+}
+
+.help-section {
+    margin-bottom: 25px;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    border: 1px solid var(--gryffindor-gold);
+}
+
+.help-section h3 {
+    color: var(--gryffindor-gold);
+    margin-bottom: 15px;
+}
+
+.help-section ul {
+    list-style: none;
+    padding-left: 20px;
+}
+
+.help-section li {
+    margin-bottom: 8px;
+    position: relative;
+}
+
+.help-section li:before {
+    content: "•";
+    color: var(--gryffindor-gold);
+    position: absolute;
+    left: -20px;
+}
+
+.help-section p {
+    line-height: 1.5;
+}
+
+.close-help {
+    display: block;
+    margin: 20px auto 0;
 } 
