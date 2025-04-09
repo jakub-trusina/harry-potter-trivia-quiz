@@ -502,106 +502,105 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     function cleanupModalState() {
-        if (currentModalState.timer) {
-            clearTimeout(currentModalState.timer);
-            currentModalState.timer = null;
-        }
-        currentModalState.isOpen = false;
-        currentModalState.questionId = null;
-    }
-    function showQuestionDialog(question, answers, role) {
-        const modal = document.getElementById('quiz-modal');
-        const questionText = document.getElementById('question-text');
-        const answersContainer = document.getElementById('answers-container');
-        const timer = document.getElementById('timer');
-        if (!modal || !questionText || !answersContainer || !timer)
-            return;
-        // Clean up any existing modal state
-        cleanupModalState();
-        // Set new modal state
-        currentModalState.isOpen = true;
-        currentModalState.questionId = Date.now().toString();
-        // Show modal
-        modal.classList.remove('hidden');
-        questionText.textContent = question;
-        // Start timer
-        let timeLeft = 20;
-        timer.textContent = timeLeft.toString();
-        const timerInterval = setInterval(() => {
-            timeLeft--;
-            timer.textContent = timeLeft.toString();
-            if (timeLeft <= 0) {
-                clearInterval(timerInterval);
-                socket.emit('submit-answer', '');
-                cleanupModalState();
-            }
-        }, 1000);
-        currentModalState.timer = timerInterval;
-        // Create answer buttons
-        answersContainer.innerHTML = '';
-        answers.forEach((answer, index) => {
-            const button = document.createElement('button');
-            button.className = 'answer-btn';
-            button.textContent = answer;
-            button.addEventListener('click', () => {
-                clearInterval(timerInterval);
-                socket.emit('submit-answer', answer);
-                cleanupModalState();
-            });
-            answersContainer.appendChild(button);
-        });
-    }
-    socket.on('question', (data) => {
-        showQuestionDialog(data.question, data.answers, data.role);
-    });
-    socket.on('duel-result', (result) => {
         const modal = document.getElementById('quiz-modal');
         const duelResult = document.getElementById('duel-result');
         const observerResponses = document.getElementById('observer-responses');
         const observerAnswers = document.getElementById('observer-answers-container');
-        if (!modal || !duelResult || !observerResponses || !observerAnswers)
+        if (!modal || !duelResult || !observerResponses || !observerAnswers) {
+            console.error('❌ Required modal elements not found');
             return;
-        // Clean up any existing modal state
-        cleanupModalState();
-        // Show duel result
-        duelResult.classList.remove('hidden');
-        // Get player names
-        const attacker = playerData.find(p => p.id === result.attackerId);
-        const defender = result.defenderId ? playerData.find(p => p.id === result.defenderId) : null;
-        // Show who won and the correct answer
-        duelResult.innerHTML = `
-            <div class="result">
-                <div>Correct answer: ${result.answerText}</div>
-                <div class="${result.attackerCorrect ? 'correct' : 'incorrect'}">
-                    ${attacker?.name}: ${result.attackerCorrect ? 'Correct' : 'Incorrect'}
-                </div>
-                ${result.defenderCorrect !== undefined ? `
-                    <div class="${result.defenderCorrect ? 'correct' : 'incorrect'}">
-                        ${defender?.name}: ${result.defenderCorrect ? 'Correct' : 'Incorrect'}
-                    </div>
-                ` : ''}
-                <div>Winner: ${result.winner === 'attacker' ? attacker?.name :
-            result.winner === 'defender' ? defender?.name : 'No one'}</div>
-            </div>
-        `;
-        // Add duel result to log
-        const territory = territoryData[result.territory];
-        if (territory) {
-            if (result.winner === 'attacker') {
-                addLogEntry(`${attacker?.name} took control of territory [${territory.x}, ${territory.y}]!`);
-            }
-            else if (result.winner === 'defender') {
-                addLogEntry(`${defender?.name} successfully defended territory [${territory.x}, ${territory.y}]!`);
-            }
-            else {
-                addLogEntry(`Duel for territory [${territory.x}, ${territory.y}] ended in a draw.`);
-            }
         }
-        // Close modal after 5 seconds
-        setTimeout(() => {
-            modal.classList.add('hidden');
+        // Clear any existing timer
+        if (currentModalState.timer) {
+            clearInterval(currentModalState.timer);
+            currentModalState.timer = null;
+        }
+        // Reset modal state
+        currentModalState.isOpen = false;
+        currentModalState.questionId = null;
+        // Hide all modal sections
+        modal.classList.add('hidden');
+        duelResult.classList.add('hidden');
+        observerResponses.classList.add('hidden');
+        // Clear observer answers
+        observerAnswers.innerHTML = '';
+    }
+    socket.on('duel-result', (result) => {
+        try {
+            const modal = document.getElementById('quiz-modal');
+            const duelResult = document.getElementById('duel-result');
+            const observerResponses = document.getElementById('observer-responses');
+            const observerAnswers = document.getElementById('observer-answers-container');
+            if (!modal || !duelResult || !observerResponses || !observerAnswers) {
+                console.error('❌ Required modal elements not found for duel result');
+                return;
+            }
+            // Clean up any existing modal state
             cleanupModalState();
-        }, 5000);
+            // Show duel result
+            duelResult.classList.remove('hidden');
+            // Get player names
+            const attacker = playerData.find(p => p.id === result.attackerId);
+            const defender = result.defenderId ? playerData.find(p => p.id === result.defenderId) : null;
+            if (!attacker) {
+                console.error('❌ Attacker not found in player data:', result.attackerId);
+                return;
+            }
+            // Show who won and the correct answer
+            let resultHTML = `
+                <div class="result">
+                    <div class="correct-answer">Correct answer: ${result.answerText}</div>
+                    <div class="player-result ${result.attackerCorrect ? 'correct' : 'incorrect'}">
+                        ${attacker.name}: ${result.attackerCorrect ? 'Correct' : 'Incorrect'}
+                    </div>
+            `;
+            if (result.defenderCorrect !== undefined && defender) {
+                resultHTML += `
+                    <div class="player-result ${result.defenderCorrect ? 'correct' : 'incorrect'}">
+                        ${defender.name}: ${result.defenderCorrect ? 'Correct' : 'Incorrect'}
+                    </div>
+                `;
+            }
+            // Add observer results if any
+            if (result.observerResults && result.observerResults.length > 0) {
+                resultHTML += '<div class="observer-results">';
+                result.observerResults.forEach(observerResult => {
+                    const observer = playerData.find(p => p.id === observerResult.playerId);
+                    if (observer) {
+                        resultHTML += `
+                            <div class="observer-result ${observerResult.correct ? 'correct' : 'incorrect'}">
+                                ${observer.name}: ${observerResult.correct ? 'Correct' : 'Incorrect'}
+                                ${observerResult.scoreGained ? `(+${observerResult.scoreGained} points)` : ''}
+                            </div>
+                        `;
+                    }
+                });
+                resultHTML += '</div>';
+            }
+            // Add winner announcement
+            if (result.winner) {
+                const winner = result.winner === 'attacker' ? attacker : defender;
+                if (winner) {
+                    resultHTML += `
+                        <div class="winner-result">
+                            ${winner.name} wins the duel!
+                        </div>
+                    `;
+                }
+            }
+            resultHTML += '</div>';
+            duelResult.innerHTML = resultHTML;
+            // Show the modal
+            modal.classList.remove('hidden');
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                cleanupModalState();
+            }, 5000);
+        }
+        catch (error) {
+            console.error('❌ Error handling duel result:', error);
+            cleanupModalState();
+        }
     });
     socket.on('game-end', (data) => {
         const gameScreen = document.getElementById('game-screen');
@@ -704,6 +703,53 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('beforeunload', () => {
         cleanupModalState();
     });
+    function showQuestionDialog(question, answers, role) {
+        const modal = document.getElementById('quiz-modal');
+        const questionText = document.getElementById('question-text');
+        const answersContainer = document.getElementById('answers-container');
+        const timer = document.getElementById('timer');
+        const duelStatus = document.getElementById('duel-status');
+        if (!modal || !questionText || !answersContainer || !timer || !duelStatus) {
+            console.error('❌ Required modal elements not found');
+            return;
+        }
+        // Clean up any existing modal state
+        cleanupModalState();
+        // Set new modal state
+        currentModalState.isOpen = true;
+        currentModalState.questionId = Date.now().toString();
+        // Show modal and set role-specific styling
+        modal.classList.remove('hidden');
+        duelStatus.innerHTML = `<div class="duel-player ${role}">${role.toUpperCase()}</div>`;
+        // Set question text
+        questionText.textContent = question;
+        // Start timer
+        let timeLeft = 20;
+        timer.textContent = timeLeft.toString();
+        const timerInterval = setInterval(() => {
+            timeLeft--;
+            timer.textContent = timeLeft.toString();
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                socket.emit('submit-answer', '');
+                cleanupModalState();
+            }
+        }, 1000);
+        currentModalState.timer = timerInterval;
+        // Create answer buttons
+        answersContainer.innerHTML = '';
+        answers.forEach((answer, index) => {
+            const button = document.createElement('button');
+            button.className = 'answer-btn';
+            button.textContent = answer;
+            button.addEventListener('click', () => {
+                clearInterval(timerInterval);
+                socket.emit('submit-answer', answer);
+                cleanupModalState();
+            });
+            answersContainer.appendChild(button);
+        });
+    }
 });
 export {};
 //# sourceMappingURL=game.js.map

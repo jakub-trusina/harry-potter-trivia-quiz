@@ -4,7 +4,7 @@ import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { GameState, Player, Question, DuelResult, ObserverResult } from './types/game';
+import { GameState, Player } from './types/game';
 import { readFileSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -39,23 +39,60 @@ const questions: Question[] = JSON.parse(
     readFileSync(path.join(projectRoot, 'src', 'data', 'questions.json'), 'utf-8')
 );
 
+interface PlayerState {
+    id: string;
+    name: string;
+    role?: 'attacker' | 'defender';
+    territories: string[];
+    score: number;
+}
+
+interface Question {
+    id: string;
+    text: string;
+    correctAnswer: string;
+    difficulty: "easy" | "medium" | "hard";
+    answers: string[];
+}
+
 interface DuelData {
     attackerId: string;
-    defenderId?: string;
+    defenderId: string;
+    observers: Set<string>;
+    currentQuestion: Question | null;
+    answers: Map<string, boolean>;
+    observerAnswers: Map<string, boolean>;
+    isActive: boolean;
     territory: string;
-    question: Question;
-    answers: string[];
-    correctAnswer: string;
-    observers: string[];
-    observerAnswers: Map<string, { answer: string; timestamp: number }>;
     attackerAnswer?: string;
     defenderAnswer?: string;
-    round?: number;
+    correctAnswer?: string;
     timeoutId?: NodeJS.Timeout;
+    round?: number;
+}
+
+interface ObserverResult {
+    playerId: string;
+    answer: string;
+    correct: boolean;
+    scoreGained: number;
+}
+
+interface DuelResult {
+    type: 'claimed' | 'unclaimed';
+    attackerCorrect: boolean;
+    defenderCorrect?: boolean;
+    attackerId: string;
+    defenderId?: string;
+    territoryId: string;
+    answerText?: string;
+    correctAnswer?: string;
+    observerResults?: ObserverResult[];
+    winner?: string | null;  // Updated to allow null
 }
 
 const activeQuestions = new Map<string, DuelData>();
-const activeDuels = new Set<string>();
+const activeDuels = new Map<string, DuelData>();
 
 function shuffleArray<T>(array: T[]): T[] {
     for (let i = array.length - 1; i > 0; i--) {
@@ -66,9 +103,9 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 function getRandomQuestion(territoryValue: number): Question {
-    // Filter questions based on territory value
-    const difficulty = territoryValue === 3 ? 'hard' : 
-                      territoryValue === 2 ? 'medium' : 'easy';
+    // Map territory value to difficulty
+    const difficulty = territoryValue === 3 ? "hard" : 
+                      territoryValue === 2 ? "medium" : "easy";
     
     const filteredQuestions = questions.filter(q => q.difficulty === difficulty);
     
@@ -83,124 +120,79 @@ function getRandomQuestion(territoryValue: number): Question {
 
 // Helper function to check if a territory is connected to a capitol
 function checkSupplyLine(territoryId: string, playerId: string): boolean {
-    console.log(`🔍 Checking supply line for territory ${territoryId} (player ${playerId})`);
-    
     const territory = gameState.territories[territoryId];
-    if (!territory || territory.owner !== playerId) {
-        console.log(`❌ Territory ${territoryId} not found or not owned by player ${playerId}`);
-        return false;
-    }
+    if (!territory || territory.owner !== playerId) return false;
     
     // If it's a capitol, it always has a supply line
-    if (territory.isCapitol) {
-        console.log(`✅ Territory ${territoryId} is a capitol - always has supply line`);
-        return true;
-    }
+    if (territory.isCapitol) return true;
     
     // Find the player's capitol
     const capitol = Object.values(gameState.territories)
         .find(t => t.owner === playerId && t.isCapitol);
     
-    if (!capitol) {
-        console.log(`❌ No capitol found for player ${playerId}`);
-        return false;
-    }
+    if (!capitol) return false;
     
-    console.log(`📍 Found capitol at ${capitol.id} for player ${playerId}`);
-    
-    // The key problem: We should start BFS from the territory, NOT the capitol!
-    // That's because we want to find if there's a path FROM the territory TO the capitol
-    
-    // We want to check if there's a path from the territory to the capitol using BFS
+    // Start BFS from the capitol to find all connected territories
     const visited = new Set<string>();
-    const queue: string[] = [territoryId]; // Start from the territory we're checking
-    
-    console.log(`🔄 Starting BFS from territory ${territoryId} to find path to capitol ${capitol.id}`);
+    const queue: string[] = [capitol.id];
+    visited.add(capitol.id);
     
     while (queue.length > 0) {
         const currentId = queue.shift()!;
-        if (visited.has(currentId)) continue;
-        visited.add(currentId);
-        
-        console.log(`👉 Checking territory ${currentId}`);
-        
-        // If we found the capitol, we have a supply line
-        if (currentId === capitol.id) {
-            console.log(`✅ Found path to capitol! ${territoryId} -> ... -> ${capitol.id}`);
-            return true;
-        }
-        
-        // Get coordinates of current territory
         const [tx, ty] = currentId.split('-').map(Number);
-        
-        // Check all adjacent territories
         const adjacent = getAdjacentTerritories(tx, ty, 6);
-        console.log(`📊 Adjacent territories to ${currentId}:`, adjacent);
         
         for (const adjId of adjacent) {
+            if (visited.has(adjId)) continue;
+            
             const adjTerritory = gameState.territories[adjId];
-            // Only follow path through territories owned by the player
             if (adjTerritory && adjTerritory.owner === playerId) {
-                console.log(`➡️ Can move to ${adjId} (owned by player)`);
+                visited.add(adjId);
                 queue.push(adjId);
-            } else {
-                console.log(`❌ Cannot move to ${adjId} (not owned by player or does not exist)`);
             }
         }
     }
     
-    console.log(`❌ No path found from ${territoryId} to capitol ${capitol.id}`);
-    return false;
+    return visited.has(territoryId);
 }
 
 // Update supply lines for all territories of a player
 function updateSupplyLines(playerId: string): Promise<void> {
     return new Promise((resolve) => {
-        console.log(`\n🔄 Updating supply lines for player ${playerId}`);
-        
         const player = gameState.players.find(p => p.id === playerId);
         if (!player) {
-            console.error(`❌ Player ${playerId} not found`);
             resolve();
             return;
         }
 
         // Reset supply lines
         player.supplyLines = [];
-        console.log(`🧹 Reset supply lines for player ${playerId}`);
 
         // Find all territories owned by the player
         const ownedTerritories = Object.values(gameState.territories)
             .filter(t => t.owner === playerId)
             .map(t => t.id);
-        
-        console.log(`📊 Player ${playerId} owns territories:`, ownedTerritories);
 
-        // Create supply lines between connected territories
+        // First, find all territories that have a path to capitol
+        const territoriesWithSupplyLine = new Set<string>();
         for (const territoryId of ownedTerritories) {
-            // Only create supply lines for territories that have a path to capitol
-            const hasSupplyLine = checkSupplyLine(territoryId, playerId);
-            console.log(`🔍 Territory ${territoryId} supply line check: ${hasSupplyLine}`);
-            
-            if (!hasSupplyLine) {
-                console.log(`❌ Skipping ${territoryId} - no path to capitol`);
-                continue;
+            if (checkSupplyLine(territoryId, playerId)) {
+                territoriesWithSupplyLine.add(territoryId);
+                // Update territory's hasSupplyLine property
+                gameState.territories[territoryId].hasSupplyLine = true;
+            } else {
+                // Mark territory as disconnected
+                gameState.territories[territoryId].hasSupplyLine = false;
             }
-            
+        }
+
+        // Create supply lines between connected territories that both have paths to capitol
+        for (const territoryId of territoriesWithSupplyLine) {
             const [tx, ty] = territoryId.split('-').map(Number);
             
             // Check all adjacent territories
-            for (const adjacentId of ownedTerritories) {
+            for (const adjacentId of territoriesWithSupplyLine) {
                 if (territoryId === adjacentId) continue;
-                
-                // Only create supply line if adjacent territory also has path to capitol
-                const adjacentHasSupplyLine = checkSupplyLine(adjacentId, playerId);
-                console.log(`🔍 Adjacent territory ${adjacentId} supply line check: ${adjacentHasSupplyLine}`);
-                
-                if (!adjacentHasSupplyLine) {
-                    console.log(`❌ Skipping connection to ${adjacentId} - no path to capitol`);
-                    continue;
-                }
                 
                 const [ax, ay] = adjacentId.split('-').map(Number);
                 const dx = Math.abs(tx - ax);
@@ -215,19 +207,15 @@ function updateSupplyLines(playerId: string): Promise<void> {
                     );
                     
                     if (!existingLine) {
-                        console.log(`✅ Creating supply line: ${territoryId} <-> ${adjacentId}`);
                         player.supplyLines.push({
                             from: territoryId,
                             to: adjacentId
                         });
-                    } else {
-                        console.log(`ℹ️ Supply line already exists: ${territoryId} <-> ${adjacentId}`);
                     }
                 }
             }
         }
         
-        console.log(`✅ Final supply lines for player ${playerId}:`, player.supplyLines);
         resolve();
     });
 }
@@ -236,7 +224,16 @@ function acquireDuelLock(duelId: string): boolean {
     if (activeDuels.has(duelId)) {
         return false;
     }
-    activeDuels.add(duelId);
+    activeDuels.set(duelId, {
+        attackerId: '',
+        defenderId: '',
+        territory: duelId,  // Using duelId as territory since it contains territory info
+        observers: new Set<string>(),
+        currentQuestion: null,
+        answers: new Map(),
+        observerAnswers: new Map(),
+        isActive: true
+    });
     return true;
 }
 
@@ -246,21 +243,17 @@ function releaseDuelLock(duelId: string) {
 
 function processDuelResult(result: DuelResult) {
     // Use a lock for result processing
-    const duelId = `${result.attackerId}-${result.territory}`;
+    const duelId = `${result.attackerId}-${result.territoryId}`;
     if (!acquireDuelLock(duelId)) {
         console.log('❌ Duel result is already being processed');
         return;
     }
 
     try {
-        const attackerCorrect = result.attackerAnswer === result.correctAnswer;
-        const defenderCorrect = result.defenderAnswer === result.correctAnswer;
+        const attackerCorrect = result.attackerCorrect;
+        const defenderCorrect = result.defenderCorrect ?? false;
         
-        result.attackerCorrect = attackerCorrect;
-        result.defenderCorrect = defenderCorrect;
-        result.answerText = result.correctAnswer;
-        
-        if (!result.defenderId || result.unclaimedTerritory) {
+        if (!result.defenderId || result.type === 'unclaimed') {
             result.winner = attackerCorrect ? 'attacker' : null;
         } else {
             if (attackerCorrect && !defenderCorrect) {
@@ -271,74 +264,95 @@ function processDuelResult(result: DuelResult) {
                 result.winner = null;
             }
         }
-        
-        // Update territory ownership based on winner
+
+        // Update territory ownership and supply lines synchronously
         if (result.winner === 'attacker') {
-            const territory = gameState.territories[result.territory];
+            const territory = gameState.territories[result.territoryId];
             if (!territory) {
-                console.error('❌ Territory not found:', result.territory);
+                console.error('❌ Territory not found:', result.territoryId);
                 return;
             }
 
             try {
+                // First update the defender's territories and supply lines
                 if (territory.owner) {
                     const defender = gameState.players.find(p => p.id === territory.owner);
                     if (defender) {
-                        defender.territories = defender.territories.filter(t => t !== result.territory);
+                        defender.territories = defender.territories.filter(t => t !== result.territoryId);
+                        // Update defender's supply lines immediately
+                        updateSupplyLines(defender.id).then(() => {
+                            // After defender's supply lines are updated, update attacker's ownership
+                            territory.owner = result.attackerId;
+                            const attacker = gameState.players.find(p => p.id === result.attackerId);
+                            if (!attacker) {
+                                console.error('❌ Attacker not found:', result.attackerId);
+                                return;
+                            }
+
+                            if (!attacker.territories.includes(result.territoryId)) {
+                                attacker.territories.push(result.territoryId);
+                            }
+
+                            // Update all players' supply lines after ownership change
+                            const supplyLineUpdates = Promise.all(
+                                gameState.players.map(player => updateSupplyLines(player.id))
+                            );
+
+                            // Wait for all supply line updates to complete before emitting result
+                            supplyLineUpdates.then(() => {
+                                // Emit result to all players
+                                io.emit('duel-result', result);
+                                
+                                // Clean up active questions
+                                activeQuestions.delete(result.attackerId);
+                                if (result.defenderId) {
+                                    activeQuestions.delete(result.defenderId);
+                                }
+                                
+                                // Move to next player's turn after a short delay
+                                setTimeout(() => {
+                                    nextTurn();
+                                }, 5000);
+                            });
+                        });
                     }
-                }
-                territory.owner = result.attackerId;
-                const attacker = gameState.players.find(p => p.id === result.attackerId);
-                if (!attacker) {
-                    console.error('❌ Attacker not found:', result.attackerId);
-                    return;
-                }
-                if (!attacker.territories.includes(result.territory)) {
-                    attacker.territories.push(result.territory);
+                } else {
+                    // If territory was unclaimed, simply update attacker's ownership
+                    territory.owner = result.attackerId;
+                    const attacker = gameState.players.find(p => p.id === result.attackerId);
+                    if (!attacker) {
+                        console.error('❌ Attacker not found:', result.attackerId);
+                        return;
+                    }
+
+                    if (!attacker.territories.includes(result.territoryId)) {
+                        attacker.territories.push(result.territoryId);
+                    }
+
+                    // Update supply lines and emit result
+                    updateSupplyLines(result.attackerId).then(() => {
+                        io.emit('duel-result', result);
+                        activeQuestions.delete(result.attackerId);
+                        setTimeout(() => {
+                            nextTurn();
+                        }, 5000);
+                    });
                 }
             } catch (error) {
                 console.error('❌ Error updating territory ownership:', error);
                 return;
             }
-        }
-        
-        // Update supply lines for all players with synchronization
-        const supplyLineUpdates = new Promise<void>((resolve) => {
-            let completedUpdates = 0;
-            const totalPlayers = gameState.players.length;
-            
-            gameState.players.forEach(player => {
-                updateSupplyLines(player.id).then(() => {
-                    completedUpdates++;
-                    if (completedUpdates === totalPlayers) {
-                        resolve();
-                    }
-                }).catch(error => {
-                    console.error(`❌ Error updating supply lines for player ${player.id}:`, error);
-                    completedUpdates++;
-                    if (completedUpdates === totalPlayers) {
-                        resolve();
-                    }
-                });
-            });
-        });
-
-        // Wait for supply line updates to complete before emitting result
-        supplyLineUpdates.then(() => {
-            // Emit result to all players
+        } else {
+            // If no ownership change, just emit the result
             io.emit('duel-result', result);
-            
-            // Clean up active questions
             activeQuestions.delete(result.attackerId);
             if (result.defenderId) {
                 activeQuestions.delete(result.defenderId);
             }
-            
-            // Move to next player's turn after a short delay
             setTimeout(() => {
                 nextTurn();
             }, 5000);
-        });
+        }
     } finally {
         releaseDuelLock(duelId);
     }
@@ -347,16 +361,10 @@ function processDuelResult(result: DuelResult) {
 // Helper function to get adjacent territory IDs
 function getAdjacentTerritories(x: number, y: number, grid: number): string[] {
     const adjacent: string[] = [];
-    
-    // Check all four cardinal directions
     if (x > 0) adjacent.push(`${x-1}-${y}`);
     if (x < grid-1) adjacent.push(`${x+1}-${y}`);
     if (y > 0) adjacent.push(`${x}-${y-1}`);
     if (y < grid-1) adjacent.push(`${x}-${y+1}`);
-    
-    // Debug adjacency information
-    console.log(`🔎 Adjacent territories for ${x}-${y}: ${adjacent.join(', ')}`);
-    
     return adjacent;
 }
 
@@ -811,6 +819,66 @@ function nextTurn() {
     });
 }
 
+function findPlayerDuel(playerId: string): DuelData | undefined {
+    for (const [_, duel] of activeDuels) {
+        if (duel.attackerId === playerId || 
+            duel.defenderId === playerId || 
+            duel.observers.has(playerId)) {
+            return duel;
+        }
+    }
+    return undefined;
+}
+
+function createDuel(attackerId: string, defenderId: string, territory: string): DuelData {
+    const duel: DuelData = {
+        attackerId,
+        defenderId,
+        territory,
+        observers: new Set<string>(),
+        currentQuestion: null,
+        answers: new Map<string, boolean>(),
+        observerAnswers: new Map<string, boolean>(),
+        isActive: true
+    };
+    activeDuels.set(`${attackerId}-${defenderId}`, duel);
+    return duel;
+}
+
+function addObserverToDuel(duelId: string, observerId: string): boolean {
+    const duel = activeDuels.get(duelId);
+    if (!duel) return false;
+    duel.observers.add(observerId);
+    return true;
+}
+
+function processDuelResults(duel: DuelData): void {
+    if (!duel.currentQuestion) return;
+
+    const attackerAnswer = duel.answers.get(duel.attackerId) ?? false;
+    const defenderAnswer = duel.answers.get(duel.defenderId) ?? false;
+    
+    const result: DuelResult = {
+        type: 'claimed',
+        attackerCorrect: attackerAnswer,
+        defenderCorrect: defenderAnswer,
+        attackerId: duel.attackerId,
+        defenderId: duel.defenderId,
+        territoryId: duel.territory,
+        answerText: duel.currentQuestion.text,
+        correctAnswer: duel.currentQuestion.correctAnswer,
+        observerResults: Array.from(duel.observerAnswers.entries()).map(([observerId, answer]) => ({
+            playerId: observerId,
+            answer: answer ? duel.currentQuestion!.correctAnswer : '',
+            correct: answer,
+            scoreGained: answer ? 10 : 0
+        }))
+    };
+    
+    processDuelResult(result);
+    activeDuels.delete(`${duel.attackerId}-${duel.defenderId}`);
+}
+
 // Socket.IO event handlers
 io.on('connection', (socket) => {
     console.log('👋 New connection from socket:', socket.id);
@@ -882,31 +950,13 @@ io.on('connection', (socket) => {
         // Check if there's any adjacent territory owned by the attacker with a supply line
         const [tx, ty] = territoryId.split('-').map(Number);
         const adjacentTerritories = getAdjacentTerritories(tx, ty, 6);
-        console.log(`🔍 Checking adjacent territories for attack from:`, adjacentTerritories);
-        
-        // List all player's territories with supply lines for debugging
-        const playerTerritories = Object.values(gameState.territories)
-            .filter(t => t.owner === socket.id)
-            .map(t => ({
-                id: t.id,
-                hasSupplyLine: checkSupplyLine(t.id, socket.id)
-            }));
-        
-        console.log(`🔍 Player territories with supply lines:`, playerTerritories);
         
         const validAttackingTerritories = adjacentTerritories.filter(adjId => {
             const adjTerritory = gameState.territories[adjId];
-            if (!adjTerritory || adjTerritory.owner !== socket.id) {
-                return false;
-            }
-            
-            // Check if this territory has a supply line
-            const hasSupplyLine = checkSupplyLine(adjId, socket.id);
-            console.log(`🔍 Can attack from ${adjId}? Owner: ${adjTerritory.owner}, Has supply line: ${hasSupplyLine}`);
-            return hasSupplyLine;
+            return adjTerritory && 
+                   adjTerritory.owner === socket.id && 
+                   checkSupplyLine(adjId, socket.id);
         });
-        
-        console.log(`🔍 Valid attacking territories: ${validAttackingTerritories.join(', ')}`);
         
         if (validAttackingTerritories.length === 0) {
             console.log('❌ No adjacent territory with supply line to attack from');
@@ -915,8 +965,6 @@ io.on('connection', (socket) => {
         }
         
         console.log('✅ Attack validation passed, proceeding with duel...');
-        // Start a new duel
-        const question = getRandomQuestion(territory.value);
         
         // Get all players who are not the attacker or defender
         const observers = gameState.players
@@ -926,180 +974,100 @@ io.on('connection', (socket) => {
         // Create duel data
         const duelData: DuelData = {
             attackerId: socket.id,
-            defenderId: territory.owner || undefined,
+            defenderId: territory.owner || '',
             territory: territoryId,
-            question,
-            answers: question.answers,
-            correctAnswer: question.correctAnswer,
-            observers,
-            observerAnswers: new Map(),
-            round: territory.isCapitol ? 1 : 0,
-            timeoutId: setTimeout(() => {
-                const duelData = activeQuestions.get(socket.id);
-                if (duelData) {
-                    const result: DuelResult = {
-                        attackerId: socket.id,
-                        defenderId: duelData.defenderId,
-                        territory: territoryId,
-                        attackerAnswer: duelData.attackerAnswer || '',
-                        defenderAnswer: duelData.defenderAnswer || '',
-                        correctAnswer: duelData.correctAnswer,
-                        unclaimedTerritory: !duelData.defenderId,
-                        answerText: duelData.correctAnswer,
-                        observerResults: []
-                    };
-
-                    // Process observer answers if any
-                    const observerResults: ObserverResult[] = [];
-                    for (const [observerId, observerData] of duelData.observerAnswers) {
-                        const correct = observerData.answer === duelData.correctAnswer;
-                        const scoreGained = correct ? 1 : 0;
-                        
-                        const observer = gameState.players.find(p => p.id === observerId);
-                        if (observer) {
-                            observer.score += scoreGained;
-                        }
-                        
-                        observerResults.push({
-                            playerId: observerId,
-                            answer: observerData.answer,
-                            correct,
-                            scoreGained
-                        });
-                    }
-                    
-                    result.observerResults = observerResults;
-                    processDuelResult(result);
-                }
-            }, 20000)
+            observers: new Set(observers),
+            currentQuestion: null,
+            answers: new Map<string, boolean>(),
+            observerAnswers: new Map<string, boolean>(),
+            isActive: true,
+            round: territory.isCapitol ? 1 : 0
         };
 
         // Store the duel data
         activeQuestions.set(socket.id, duelData);
 
-        // Emit question to attacker
-        socket.emit('question', { 
-            question: question.question,
-            answers: question.answers,
-            role: 'attacker'
-        });
-
-        // Emit question to defender if exists
+        // First, emit duel-started event to all participants
+        socket.emit('duel-started', { role: 'attacker' });
         if (territory.owner) {
-            io.to(territory.owner).emit('question', { 
-                question: question.question,
-                answers: question.answers,
-                role: 'defender'
-            });
+            io.to(territory.owner).emit('duel-started', { role: 'defender' });
         }
-
-        // Emit question to observers
         observers.forEach(observerId => {
-            io.to(observerId).emit('question', {
-                question: question.question,
-                answers: question.answers,
-                role: 'observer'
-            });
+            io.to(observerId).emit('duel-started', { role: 'observer' });
         });
+
+        // Wait a short moment for clients to prepare their UI
+        setTimeout(() => {
+            // Get a random question
+            const question = getRandomQuestion(territory.value);
+            duelData.currentQuestion = question;
+
+            // Emit question to attacker
+            socket.emit('question', { 
+                question: question.text,
+                answers: question.answers,
+                role: 'attacker'
+            });
+
+            // Emit question to defender if exists
+            if (territory.owner) {
+                io.to(territory.owner).emit('question', { 
+                    question: question.text,
+                    answers: question.answers,
+                    role: 'defender'
+                });
+            }
+
+            // Emit question to observers
+            observers.forEach(observerId => {
+                io.to(observerId).emit('question', {
+                    question: question.text,
+                    answers: question.answers,
+                    role: 'observer'
+                });
+            });
+
+            // Set timeout for answer submission
+            duelData.timeoutId = setTimeout(() => {
+                const duelData = activeQuestions.get(socket.id);
+                if (duelData) {
+                    const result: DuelResult = {
+                        type: 'claimed',
+                        attackerCorrect: false,
+                        defenderCorrect: false,
+                        attackerId: socket.id,
+                        defenderId: duelData.defenderId,
+                        territoryId: duelData.territory,
+                        answerText: question.text,
+                        correctAnswer: question.correctAnswer,
+                        observerResults: Array.from(duelData.observerAnswers.entries()).map(([observerId, answer]) => ({
+                            playerId: observerId,
+                            answer: answer ? question.correctAnswer : '',
+                            correct: answer,
+                            scoreGained: answer ? 10 : 0
+                        }))
+                    };
+                    processDuelResult(result);
+                }
+            }, 20000); // 20 seconds timeout
+        }, 1000); // Wait 1 second before sending questions
     });
 
     socket.on('submit-answer', (answer: string) => {
         const playerId = socket.id;
-        const duelData = activeQuestions.get(playerId);
+        const duel = findPlayerDuel(playerId);
         
-        if (!duelData) {
-            // Check if player is an observer in any active duel
-            for (const [duelId, data] of activeQuestions) {
-                if (data.observers.includes(playerId)) {
-                    // Use a lock for observer answer processing
-                    if (!acquireDuelLock(duelId)) {
-                        console.log('❌ Duel is already being processed');
-                        return;
-                    }
-                    
-                    try {
-                        data.observerAnswers.set(playerId, {
-                            answer,
-                            timestamp: Date.now()
-                        });
-                        
-                        // Emit to all players in the duel that an observer has answered
-                        io.to([data.attackerId, ...data.observers]).emit('observer-answered', {
-                            playerId,
-                            answer
-                        });
-                    } finally {
-                        releaseDuelLock(duelId);
-                    }
-                    return;
-                }
-            }
-            return;
-        }
-
-        const isAttacker = duelData.attackerId === playerId;
-        const isDefender = duelData.defenderId === playerId;
+        if (!duel) return;
         
-        if (!isAttacker && !isDefender) return;
-
-        // Validate answer
-        if (!duelData.answers.includes(answer)) {
-            console.log('❌ Invalid answer submitted');
-            return;
+        if (playerId === duel.attackerId || playerId === duel.defenderId) {
+            duel.answers.set(playerId, answer === duel.currentQuestion?.correctAnswer);
+        } else if (duel.observers.has(playerId)) {
+            duel.observerAnswers.set(playerId, answer === duel.currentQuestion?.correctAnswer);
         }
-
-        // Clear timeout if it exists
-        if (duelData.timeoutId) {
-            clearTimeout(duelData.timeoutId);
-            duelData.timeoutId = undefined;
-        }
-
-        // Use a lock for duel processing
-        const duelId = `${duelData.attackerId}-${duelData.territory}`;
-        if (!acquireDuelLock(duelId)) {
-            console.log('❌ Duel is already being processed');
-            return;
-        }
-
-        try {
-            if (isAttacker) {
-                duelData.attackerAnswer = answer;
-                // Process attacker's answer
-                const result: DuelResult = {
-                    attackerId: playerId,
-                    defenderId: duelData.defenderId,
-                    attackerAnswer: answer,
-                    defenderAnswer: duelData.defenderAnswer,
-                    correctAnswer: duelData.correctAnswer,
-                    territory: duelData.territory,
-                    unclaimedTerritory: !duelData.defenderId,
-                    answerText: duelData.correctAnswer,
-                    observerResults: []
-                };
-
-                // If it's an unclaimed territory or we have both answers, process the result
-                if (!duelData.defenderId || (duelData.defenderId && duelData.defenderAnswer)) {
-                    processDuelResult(result);
-                }
-            } else if (isDefender) {
-                duelData.defenderAnswer = answer;
-                const attackerDuel = activeQuestions.get(duelData.attackerId);
-                if (attackerDuel && attackerDuel.attackerAnswer) {
-                    const result: DuelResult = {
-                        attackerId: duelData.attackerId,
-                        defenderId: playerId,
-                        attackerAnswer: attackerDuel.attackerAnswer,
-                        defenderAnswer: answer,
-                        correctAnswer: duelData.correctAnswer,
-                        territory: duelData.territory,
-                        answerText: duelData.correctAnswer,
-                        observerResults: []
-                    };
-                    processDuelResult(result);
-                }
-            }
-        } finally {
-            releaseDuelLock(duelId);
+        
+        // Check if all players have answered
+        if (duel.answers.size === 2) {
+            processDuelResults(duel);
         }
     });
 
@@ -1121,6 +1089,45 @@ io.on('connection', (socket) => {
         });
         
         console.log('✅ Supply lines reset complete');
+    });
+
+    socket.on('start-duel', (data: { attackerId: string, defenderId: string, territory: string }) => {
+        const { attackerId, defenderId, territory } = data;
+        const duelId = `${attackerId}-${defenderId}`;
+        
+        // Create duel data
+        const duelData: DuelData = {
+            attackerId,
+            defenderId,
+            territory,
+            observers: new Set(),
+            currentQuestion: null,
+            answers: new Map(),
+            observerAnswers: new Map(),
+            isActive: true
+        };
+        
+        activeDuels.set(duelId, duelData);
+        
+        // Emit duel start to both players
+        io.to(attackerId).emit('duel-started', { role: 'attacker' });
+        io.to(defenderId).emit('duel-started', { role: 'defender' });
+        
+        // Get a random question and send it
+        const question = getRandomQuestion(gameState.territories[territory].value);
+        duelData.currentQuestion = question;
+        
+        // Send question to both players
+        io.to(attackerId).emit('question', { 
+            question: question.text,
+            answers: question.answers,
+            role: 'attacker'
+        });
+        io.to(defenderId).emit('question', {
+            question: question.text,
+            answers: question.answers,
+            role: 'defender'
+        });
     });
 });
 

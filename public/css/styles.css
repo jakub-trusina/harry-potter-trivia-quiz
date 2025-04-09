@@ -1,0 +1,45 @@
+.result {
+    padding: 20px;
+    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    margin: 20px;
+    text-align: center;
+}
+
+.correct-answer {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.player-result {
+    padding: 10px;
+    margin: 5px 0;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.player-result.correct {
+    background-color: rgba(76, 175, 80, 0.2);
+    color: #2e7d32;
+}
+
+.player-result.incorrect {
+    background-color: rgba(244, 67, 54, 0.2);
+    color: #c62828;
+}
+
+.observer-results {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+.winner-result {
+    margin-top: 15px;
+    font-size: 1.1em;
+    font-weight: bold;
+    color: #1976d2;
+} 
