@@ -410,7 +410,7 @@ input[type="text"] {
     border-radius: 15px;
     padding: 20px;
     z-index: 1000;
-    min-width: 400px;
+    min-width: 500px;
     color: white;
 }
 
@@ -491,6 +491,74 @@ input[type="text"] {
     margin: 10px 0;
     font-weight: bold;
     text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+}
+
+.observer-responses {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 2px solid var(--gryffindor-gold);
+}
+
+.observer-responses h4 {
+    color: var(--gryffindor-gold);
+    margin-bottom: 10px;
+    text-align: center;
+    font-size: 1.1rem;
+}
+
+.observer-response {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    margin-bottom: 5px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.observer-name {
+    color: var(--text-primary);
+    font-weight: bold;
+}
+
+.observer-answer {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.observer-answer.correct {
+    background-color: rgba(26, 71, 42, 0.7);
+    color: white;
+}
+
+.observer-answer.incorrect {
+    background-color: rgba(116, 0, 1, 0.7);
+    color: white;
+}
+
+.observer-score {
+    color: var(--gryffindor-gold);
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+.duel-result {
+    text-align: center;
+    margin: 15px 0;
+    padding: 10px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+.duel-result.victory {
+    background-color: rgba(26, 71, 42, 0.7);
+    color: white;
+}
+
+.duel-result.defeat {
+    background-color: rgba(116, 0, 1, 0.7);
+    color: white;
 }
 
 /* Responsive adjustments */

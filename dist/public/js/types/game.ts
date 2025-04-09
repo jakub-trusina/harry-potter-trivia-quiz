@@ -16,34 +16,36 @@ export interface Player {
     score: number;
     eliminated: boolean;
     house?: 'Gryffindor' | 'Slytherin' | 'Ravenclaw' | 'Hufflepuff';  // Make house optional
+    supplyLines: { from: string; to: string }[];
 }
 
 export interface Question {
-    id: string;
     question: string;
     answers: string[];
-    correctAnswer: number;
+    correctAnswer: string;
     difficulty: 'easy' | 'medium' | 'hard';
-    continuing?: boolean;
-    round?: number;
+}
+
+export interface ObserverResult {
+    playerId: string;
+    answer: string;
+    correct: boolean;
+    scoreGained: number;
 }
 
 export interface DuelResult {
-    winner: 'attacker' | 'defender' | null;
     attackerId: string;
-    defenderId: string;
-    attackerCorrect: boolean;
-    defenderCorrect: boolean;
-    attackerTime: number;
-    defenderTime?: number;
-    attackerAnswer: number;
-    defenderAnswer?: number;
-    correctAnswer: number;
+    defenderId?: string;
+    attackerAnswer?: string;
+    defenderAnswer?: string;
+    correctAnswer: string;
+    territory: string;
+    unclaimedTerritory?: boolean;
+    winner?: 'attacker' | 'defender' | null;
+    attackerCorrect?: boolean;
+    defenderCorrect?: boolean;
     answerText: string;
-    round: number;  // 1 for first shield, 2 for second shield, 3 for final attack
-    shieldsRemaining: number;  // Number of shields remaining for capitols
-    continuing?: boolean;  // Whether the attack continues to next round
-    unclaimedTerritory?: boolean;  // Add this property
+    observerResults: ObserverResult[];
 }
 
 export interface GameState {

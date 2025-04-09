@@ -21,6 +21,15 @@ document.addEventListener('DOMContentLoaded', () => {
         gameActive: false
     };
     let socket: any;
+    let currentModalState: {
+        isOpen: boolean;
+        questionId: string | null;
+        timer: NodeJS.Timeout | null;
+    } = {
+        isOpen: false,
+        questionId: null,
+        timer: null
+    };
     
     // Initialize DOM elements first
     const loginScreen = document.getElementById('login-screen');
@@ -331,6 +340,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const logEntries = document.getElementById('log-entries');
         const currentPlayer = playerData.find(p => p.id === playerId);
         
+        // Check if player clicked on their own territory
+        if (territory.owner === playerId) {
+            if (territory.isCapitol) {
+                // If it's a capitol, show shield information
+                const shields = territory.shields || 0;
+                addLogEntry(`This is your capitol! It has ${shields} shield${shields !== 1 ? 's' : ''}.`);
+                return;
+            } else {
+                // For regular territories, calculate and show distance from capitol
+                const capitolTerritory = Object.values(territoryData).find(t => t.owner === playerId && t.isCapitol);
+                if (capitolTerritory) {
+                    const [tx, ty] = territory.id.split('-').map(Number);
+                    const [cx, cy] = capitolTerritory.id.split('-').map(Number);
+                    const distance = Math.abs(tx - cx) + Math.abs(ty - cy); // Manhattan distance (L1)
+                    addLogEntry(`This is your territory at [${tx}, ${ty}]. Distance from capitol: ${distance}.`);
+                    return;
+                }
+            }
+        }
+        
         // Check if player is defeated (has no territories)
         if (currentPlayer && currentPlayer.territories.length === 0) {
             if (logEntries) {
@@ -340,7 +369,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="log-timestamp">${new Date().toLocaleTimeString()}</span>
                     <span>You were defeated. You can't attack since you don't have any region.</span>
                 `;
-                logEntries.insertBefore(entry, logEntries.firstChild);
+                logEntries.appendChild(entry);
+                logEntries.scrollTop = logEntries.scrollHeight;
             }
             return;
         }
@@ -353,7 +383,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="log-timestamp">${new Date().toLocaleTimeString()}</span>
                     <span>Wait for your turn to attack!</span>
                 `;
-                logEntries.insertBefore(entry, logEntries.firstChild);
+                logEntries.appendChild(entry);
+                logEntries.scrollTop = logEntries.scrollHeight;
             }
             return;
         }
@@ -376,7 +407,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="log-timestamp">${new Date().toLocaleTimeString()}</span>
                     <span>You need to connect this territory to your capitol before attacking from here!</span>
                 `;
-                logEntries.insertBefore(entry, logEntries.firstChild);
+                logEntries.appendChild(entry);
+                logEntries.scrollTop = logEntries.scrollHeight;
             }
             return;
         }
@@ -391,7 +423,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="log-timestamp">${new Date().toLocaleTimeString()}</span>
                     <span>Attacking ${defender?.name}'s territory at [${territory.x}, ${territory.y}]</span>
                 `;
-                logEntries.insertBefore(entry, logEntries.firstChild);
+                logEntries.appendChild(entry);
+                logEntries.scrollTop = logEntries.scrollHeight;
             }
             socket.emit('attack-territory', territoryId);
         } else {
@@ -402,7 +435,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="log-timestamp">${new Date().toLocaleTimeString()}</span>
                     <span>Cannot attack this territory - it must be adjacent to one of your connected territories!</span>
                 `;
-                logEntries.insertBefore(entry, logEntries.firstChild);
+                logEntries.appendChild(entry);
+                logEntries.scrollTop = logEntries.scrollHeight;
             }
         }
     }
@@ -438,11 +472,18 @@ document.addEventListener('DOMContentLoaded', () => {
         territoryData = data.territories;
         playerData = data.players;
         gameState.currentTurn = data.currentTurn;
+        
         createMap(data.territories);
         updatePlayerStats();
         
         lobbyScreenEl.classList.add('hidden');
         document.getElementById('game-screen')?.classList.remove('hidden');
+    });
+
+    // Add handler for attack errors
+    socket.on('attack-error', (errorMessage: string) => {
+        console.log(`❌ Attack error: ${errorMessage}`);
+        addLogEntry(errorMessage);
     });
 
     // Add function to update turn indicator
@@ -467,13 +508,33 @@ document.addEventListener('DOMContentLoaded', () => {
     // Update the game state update handler to call updateTurnIndicator
     socket.on('game-state-update', (data: { territories: { [key: string]: Territory }; players: Player[]; currentTurn: string }) => {
         console.log('🔄 Received game state update:', data);
+        
+        // Check if the turn has changed
+        const previousTurn = gameState.currentTurn;
+        const newTurn = data.currentTurn;
+        
+        // Update local game state
         territoryData = data.territories;
         playerData = data.players;
         gameActive = true;
-        gameState.currentTurn = data.currentTurn;
+        gameState.currentTurn = newTurn;
+        
+        // Log turn change
+        if (previousTurn !== newTurn) {
+            const currentTurnPlayer = playerData.find(p => p.id === newTurn);
+            if (currentTurnPlayer) {
+                if (currentTurnPlayer.id === playerId) {
+                    addLogEntry("It's your turn now!");
+                } else {
+                    addLogEntry(`${currentTurnPlayer.name}'s turn has begun.`);
+                }
+            }
+        }
+        
         createMap(data.territories);
         updatePlayerStats();
         updateTurnIndicator();
+        cleanupDialogs(); // Clean up any open dialogs when turn changes
     });
 
     // Add the event listener for territory debugging
@@ -507,143 +568,122 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    function showQuestionDialog(question: Question, role: 'attacker' | 'defender', round: number = 0): void {
-        const dialog = document.createElement('div');
-        dialog.className = 'question-dialog';
-        
-        const timer = document.createElement('div');
-        timer.className = 'timer';
-        dialog.appendChild(timer);
-
-        const questionText = document.createElement('div');
-        questionText.className = 'question';
-        questionText.textContent = question.question;
-        dialog.appendChild(questionText);
-
-        // Add round indicator for capitol attacks
-        if (round > 0) {
-            const roundIndicator = document.createElement('div');
-            roundIndicator.className = 'round-indicator';
-            roundIndicator.textContent = `Shield Round ${round}/3`;
-            dialog.appendChild(roundIndicator);
+    function cleanupModalState() {
+        if (currentModalState.timer) {
+            clearTimeout(currentModalState.timer);
+            currentModalState.timer = null;
         }
+        currentModalState.isOpen = false;
+        currentModalState.questionId = null;
+    }
 
-        const answersDiv = document.createElement('div');
-        answersDiv.className = 'answers';
-        dialog.appendChild(answersDiv);
-
-        const resultDiv = document.createElement('div');
-        resultDiv.className = 'result';
-        dialog.appendChild(resultDiv);
-
-        document.body.appendChild(dialog);
-
-        // First timer for reading the question (3 seconds)
-        let timeLeft = 4;
+    function showQuestionDialog(question: string, answers: string[], role: 'attacker' | 'defender' | 'observer') {
+        const modal = document.getElementById('quiz-modal');
+        const questionText = document.getElementById('question-text');
+        const answersContainer = document.getElementById('answers-container');
+        const timer = document.getElementById('timer');
+        
+        if (!modal || !questionText || !answersContainer || !timer) return;
+        
+        // Clean up any existing modal state
+        cleanupModalState();
+        
+        // Set new modal state
+        currentModalState.isOpen = true;
+        currentModalState.questionId = Date.now().toString();
+        
+        // Show modal
+        modal.classList.remove('hidden');
+        questionText.textContent = question;
+        
+        // Start timer
+        let timeLeft = 20;
         timer.textContent = timeLeft.toString();
         
-        const readingInterval = setInterval(() => {
+        const timerInterval = setInterval(() => {
             timeLeft--;
             timer.textContent = timeLeft.toString();
             
             if (timeLeft <= 0) {
-                clearInterval(readingInterval);
-                showAnswers();
+                clearInterval(timerInterval);
+                socket.emit('submit-answer', '');
+                cleanupModalState();
             }
         }, 1000);
-
-        function showAnswers(): void {
-            // Show answer buttons
-            question.answers.forEach((answer, index) => {
-                const button = document.createElement('button');
-                button.className = 'answer-button';
-                button.textContent = answer;
-                button.onclick = () => {
-                    // Highlight selected answer
-                    document.querySelectorAll('.answer-button').forEach(btn => {
-                        btn.classList.remove('selected');
-                    });
-                    button.classList.add('selected');
-                    submitAnswer(index);
-                };
-                answersDiv.appendChild(button);
+        
+        currentModalState.timer = timerInterval;
+        
+        // Create answer buttons
+        answersContainer.innerHTML = '';
+        answers.forEach((answer, index) => {
+            const button = document.createElement('button');
+            button.className = 'answer-btn';
+            button.textContent = answer;
+            button.addEventListener('click', () => {
+                clearInterval(timerInterval);
+                socket.emit('submit-answer', answer);
+                cleanupModalState();
             });
-
-            // Start 15-second timer for answering
-            timeLeft = 15;
-            timer.textContent = timeLeft.toString();
-            
-            const answerInterval = setInterval(() => {
-                timeLeft--;
-                timer.textContent = timeLeft.toString();
-                
-                if (timeLeft <= 0) {
-                    clearInterval(answerInterval);
-                    submitAnswer(-1); // No answer selected
-                }
-            }, 1000);
-
-            function submitAnswer(answerIndex: number): void {
-                clearInterval(answerInterval);
-                const buttons = answersDiv.getElementsByTagName('button');
-                
-                // Highlight correct answer in green
-                if (buttons[question.correctAnswer]) {
-                    buttons[question.correctAnswer].classList.add('correct');
-                }
-                
-                // If selected answer is wrong, highlight it in red
-                if (answerIndex !== question.correctAnswer && answerIndex !== -1 && buttons[answerIndex]) {
-                    buttons[answerIndex].classList.add('incorrect');
-                }
-
-                for (let i = 0; i < buttons.length; i++) {
-                    buttons[i].disabled = true;
-                }
-
-                socket.emit('submit-answer', {
-                    answer: answerIndex,
-                    responseTime: 15 - timeLeft
-                });
-            }
-        }
+            answersContainer.appendChild(button);
+        });
     }
 
-    // Add socket event handlers for the quiz system
-    socket.on('question-start', (data: { question: Question; role: 'attacker' | 'defender' }) => {
-        showQuestionDialog(data.question, data.role);
+    socket.on('question', (data: { question: string, answers: string[], role: 'attacker' | 'defender' | 'observer' }) => {
+        showQuestionDialog(data.question, data.answers, data.role);
     });
 
     socket.on('duel-result', (result: DuelResult) => {
-        const dialog = document.querySelector('.question-dialog');
-        if (!dialog) return;
-
-        const resultDiv = dialog.querySelector('.result');
-        if (!resultDiv) return;
-
+        const modal = document.getElementById('quiz-modal');
+        const duelResult = document.getElementById('duel-result');
+        const observerResponses = document.getElementById('observer-responses');
+        const observerAnswers = document.getElementById('observer-answers-container');
+        
+        if (!modal || !duelResult || !observerResponses || !observerAnswers) return;
+        
+        // Clean up any existing modal state
+        cleanupModalState();
+        
+        // Show duel result
+        duelResult.classList.remove('hidden');
+        
         // Get player names
         const attacker = playerData.find(p => p.id === result.attackerId);
-        const defender = playerData.find(p => p.id === result.defenderId);
-
+        const defender = result.defenderId ? playerData.find(p => p.id === result.defenderId) : null;
+        
         // Show who won and the correct answer
-        resultDiv.innerHTML = `
-            <div>Correct answer: ${result.answerText}</div>
-            <div class="${result.attackerCorrect ? 'correct' : 'incorrect'}">
-                ${attacker?.name}: ${result.attackerCorrect ? 'Correct' : 'Incorrect'}
-            </div>
-            ${result.defenderCorrect !== undefined ? `
-                <div class="${result.defenderCorrect ? 'correct' : 'incorrect'}">
-                    ${defender?.name}: ${result.defenderCorrect ? 'Correct' : 'Incorrect'}
+        duelResult.innerHTML = `
+            <div class="result">
+                <div>Correct answer: ${result.answerText}</div>
+                <div class="${result.attackerCorrect ? 'correct' : 'incorrect'}">
+                    ${attacker?.name}: ${result.attackerCorrect ? 'Correct' : 'Incorrect'}
                 </div>
-            ` : ''}
-            <div>Winner: ${result.winner === 'attacker' ? attacker?.name : 
-                                   result.winner === 'defender' ? defender?.name : 'No one'}</div>
+                ${result.defenderCorrect !== undefined ? `
+                    <div class="${result.defenderCorrect ? 'correct' : 'incorrect'}">
+                        ${defender?.name}: ${result.defenderCorrect ? 'Correct' : 'Incorrect'}
+                    </div>
+                ` : ''}
+                <div>Winner: ${result.winner === 'attacker' ? attacker?.name : 
+                                    result.winner === 'defender' ? defender?.name : 'No one'}</div>
+            </div>
         `;
-
-        // Remove the dialog after 4 seconds
+        
+        // Add duel result to log
+        const territory = territoryData[result.territory];
+        if (territory) {
+            if (result.winner === 'attacker') {
+                addLogEntry(`${attacker?.name} took control of territory [${territory.x}, ${territory.y}]!`);
+            } else if (result.winner === 'defender') {
+                addLogEntry(`${defender?.name} successfully defended territory [${territory.x}, ${territory.y}]!`);
+            } else {
+                addLogEntry(`Duel for territory [${territory.x}, ${territory.y}] ended in a draw.`);
+            }
+        }
+        
+        // Close modal after 5 seconds
         setTimeout(() => {
-            dialog.remove();
-        }, 4000);
+            modal.classList.add('hidden');
+            cleanupModalState();
+        }, 5000);
     });
 
     socket.on('game-end', (data: { 
@@ -703,4 +743,62 @@ document.addEventListener('DOMContentLoaded', () => {
             logEntries.scrollTop = logEntries.scrollHeight;
         }
     }
+
+    socket.on('observer-answered', (data: { playerId: string, answer: string }) => {
+        const observerResponses = document.getElementById('observer-responses');
+        const observerAnswers = document.getElementById('observer-answers-container');
+        
+        if (!observerResponses || !observerAnswers) return;
+        
+        // Show observer responses section if not already visible
+        observerResponses.classList.remove('hidden');
+        
+        // Add the new observer response
+        const player = playerData.find(p => p.id === data.playerId);
+        const responseDiv = document.createElement('div');
+        responseDiv.className = 'observer-response';
+        responseDiv.innerHTML = `
+            <span class="observer-name">${player?.name || 'Unknown'}</span>
+            <div>
+                <span class="observer-answer">
+                    ${data.answer}
+                </span>
+            </div>
+        `;
+        observerAnswers.appendChild(responseDiv);
+    });
+
+    // Add cleanup function for when turn changes
+    function cleanupDialogs() {
+        const modal = document.getElementById('quiz-modal');
+        const duelResult = document.getElementById('duel-result');
+        const observerResponses = document.getElementById('observer-responses');
+        const observerAnswers = document.getElementById('observer-answers-container');
+        
+        if (modal) modal.classList.add('hidden');
+        if (duelResult) duelResult.classList.add('hidden');
+        if (observerResponses) observerResponses.classList.add('hidden');
+        
+        // Clear any selected answers
+        document.querySelectorAll('.answer-btn').forEach(btn => {
+            btn.classList.remove('selected');
+            (btn as HTMLButtonElement).disabled = false;
+        });
+        
+        // Remove any existing question dialogs
+        document.querySelectorAll('.question-dialog').forEach(dialog => dialog.remove());
+        
+        // Clear any existing result content
+        if (duelResult) {
+            duelResult.innerHTML = '';
+        }
+        if (observerAnswers) {
+            observerAnswers.innerHTML = '';
+        }
+    }
+
+    // Add cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        cleanupModalState();
+    });
 }); 

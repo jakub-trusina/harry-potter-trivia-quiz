@@ -16,7 +16,7 @@
         <div id="login-screen" class="screen">
             <div class="wizard-card">
                 <div class="card-header">
-                    <h2>Enter Your Wizard Name</h2>
+                    <h2>Enter Your Player Name</h2>
                     <button class="help-button" title="Game Guide">?</button>
                 </div>
                 <input type="text" id="player-name" placeholder="e.g., Gryffindor Wizard">
@@ -31,10 +31,10 @@
                     <button class="help-button" title="Game Guide">?</button>
                 </div>
                 <div class="player-list-container">
-                    <h3>Connected Wizards</h3>
+                    <h3>Connected Players</h3>
                     <ul id="player-list"></ul>
                 </div>
-                <p class="waiting-text">Waiting for wizards (2-4 needed)</p>
+                <p class="waiting-text">Waiting for players (2-4 needed)</p>
                 <button id="start-game-btn" class="hp-button" disabled>Begin Adventure</button>
             </div>
         </div>
@@ -45,13 +45,13 @@
                 <div id="game-info">
                     <div class="player-stats-container">
                         <div class="stats-header">
-                            <h3>Wizard Stats</h3>
+                            <h3>Player Stats</h3>
                             <button class="help-button" title="Game Guide">?</button>
                         </div>
                         <div id="player-stats"></div>
                     </div>
                     <div id="action-log">
-                        <h3>Spell Log</h3>
+                        <h3>Action Log</h3>
                         <div id="log-entries"></div>
                     </div>
                 </div>
@@ -60,13 +60,18 @@
     </div>
 
     <div id="quiz-modal" class="modal hidden">
-        <div class="modal-content wizard-card">
+        <div class="modal-content wizard-card question-dialog">
             <h2>Magical Duel</h2>
             <div id="timer">30</div>
             <div id="duel-status"></div>
             <div id="question-container">
                 <p id="question-text"></p>
                 <div id="answers-container"></div>
+            </div>
+            <div id="duel-result" class="duel-result hidden"></div>
+            <div id="observer-responses" class="observer-responses hidden">
+                <h4>Spectator Answers</h4>
+                <div id="observer-answers-container"></div>
             </div>
         </div>
     </div>

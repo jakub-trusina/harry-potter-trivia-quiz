@@ -15,32 +15,36 @@ export interface Player {
     score: number;
     eliminated: boolean;
     house?: 'Gryffindor' | 'Slytherin' | 'Ravenclaw' | 'Hufflepuff';
+    supplyLines: {
+        from: string;
+        to: string;
+    }[];
 }
 export interface Question {
-    id: string;
     question: string;
     answers: string[];
-    correctAnswer: number;
+    correctAnswer: string;
     difficulty: 'easy' | 'medium' | 'hard';
-    continuing?: boolean;
-    round?: number;
+}
+export interface ObserverResult {
+    playerId: string;
+    answer: string;
+    correct: boolean;
+    scoreGained: number;
 }
 export interface DuelResult {
-    winner: 'attacker' | 'defender' | null;
     attackerId: string;
-    defenderId: string;
-    attackerCorrect: boolean;
-    defenderCorrect: boolean;
-    attackerTime: number;
-    defenderTime?: number;
-    attackerAnswer: number;
-    defenderAnswer?: number;
-    correctAnswer: number;
-    answerText: string;
-    round: number;
-    shieldsRemaining: number;
-    continuing?: boolean;
+    defenderId?: string;
+    attackerAnswer?: string;
+    defenderAnswer?: string;
+    correctAnswer: string;
+    territory: string;
     unclaimedTerritory?: boolean;
+    winner?: 'attacker' | 'defender' | null;
+    attackerCorrect?: boolean;
+    defenderCorrect?: boolean;
+    answerText: string;
+    observerResults: ObserverResult[];
 }
 export interface GameState {
     territories: {
