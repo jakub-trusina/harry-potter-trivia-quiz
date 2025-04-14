@@ -1,0 +1,223 @@
+/* Game UI Colors */
+:root {
+    --primary-color: #c4a052;  /* Gold */
+    --primary-hover: #d4b062;
+    --secondary-color: #2c2c2c; /* Dark gray */
+    --accent-color: #8b0000;   /* Dark red */
+    --text-primary: #ffffff;
+    --text-secondary: #e0e0e0;
+    --background-dark: rgba(0, 0, 0, 0.85);
+    --background-light: rgba(255, 255, 255, 0.1);
+    --border-color: rgba(196, 160, 82, 0.3);
+}
+
+/* Modal Base Styles */
+.modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--background-dark);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    padding: 2rem;
+    color: var(--text-primary);
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    min-width: 400px;
+    backdrop-filter: blur(5px);
+}
+
+/* Button Styles */
+.btn {
+    background: var(--primary-color);
+    color: var(--text-primary);
+    border: none;
+    padding: 12px 24px;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.btn:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.btn:active {
+    transform: translateY(1px);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Game Over Modal */
+#game-over-modal {
+    text-align: center;
+    max-width: 600px;
+}
+
+#game-over-modal h2 {
+    font-size: 2.5rem;
+    margin-bottom: 1.5rem;
+    color: var(--primary-color);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.winner-display {
+    font-size: 1.2rem;
+    margin: 1.5rem 0;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+/* Table Styles */
+.final-scores-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 1.5rem 0;
+}
+
+.final-scores-table th {
+    background: var(--primary-color);
+    color: var(--text-primary);
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.final-scores-table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+
+.final-scores-table tr:last-child td {
+    border-bottom: none;
+}
+
+.final-scores-table tr:hover td {
+    background: var(--background-light);
+}
+
+/* Duel Modal */
+#duel-modal {
+    max-width: 500px;
+}
+
+#duel-modal .question {
+    font-size: 1.2rem;
+    margin-bottom: 1.5rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+}
+
+#duel-modal .answers {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+#duel-modal .answer-btn {
+    background: var(--background-light);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 1rem;
+    text-align: left;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+#duel-modal .answer-btn:hover {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+/* Result Modal */
+#result-modal {
+    text-align: center;
+}
+
+#result-modal .result-message {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+    color: var(--primary-color);
+}
+
+/* Game Board */
+.game-board {
+    transition: opacity 0.3s ease;
+}
+
+.game-board.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Player Stats */
+.player-stats {
+    background: var(--background-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.player-stats h3 {
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+    font-size: 1.2rem;
+}
+
+/* Action Log */
+.action-log {
+    background: var(--background-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 1rem;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.action-log-entry {
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translate(-50%, -48%); }
+    to { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+.modal {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--background-dark);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-hover);
+} 

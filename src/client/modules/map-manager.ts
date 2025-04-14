@@ -3,15 +3,32 @@ import { Territory } from '../../types/game.js';
 import { addLogEntry } from './log-manager.js';
 
 export function createMap(state: GameStateManager): void {
-    console.log("Creating map with territories:", state.territories);
-    if (!state.ui) return;
+    const mapContainer = document.getElementById('map-container');
+    if (!mapContainer) return;
     
-    const { mapContainer } = state.ui;
+    // Clear existing map
     mapContainer.innerHTML = '';
     
+    // Create grid
     Object.values(state.territories).forEach(territory => {
-        const territoryDiv = createTerritoryElement(state, territory);
-        mapContainer.appendChild(territoryDiv);
+        const territoryElement = createTerritoryElement(state, territory);
+        mapContainer.appendChild(territoryElement);
+    });
+}
+
+export function updateMap(state: GameStateManager): void {
+    const mapContainer = document.getElementById('map-container');
+    if (!mapContainer) return;
+    
+    // Update each territory's classes
+    Object.values(state.territories).forEach(territory => {
+        const territoryElement = mapContainer.querySelector(`[data-id="${territory.id}"]`);
+        if (territoryElement) {
+            // Remove existing classes
+            territoryElement.className = 'territory player-territory';
+            // Re-add classes based on current state
+            addTerritoryClasses(territoryElement as HTMLElement, territory, state);
+        }
     });
 }
 

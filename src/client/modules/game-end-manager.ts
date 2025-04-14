@@ -7,48 +7,76 @@ interface GameEndData {
     finalScores: Array<{ name: string; score: number }>;
 }
 
-export function initializeGameEndHandler(state: GameStateManager): void {
-    if (!state.socket) return;
+export function initializeGameEndHandler(socket: any, state: any) {
+    socket.on('close-all-modals', () => {
+        // Close all modals
+        if (state.ui?.duelModal) {
+            state.ui.duelModal.style.display = 'none';
+        }
+        if (state.ui?.observerModal) {
+            state.ui.observerModal.style.display = 'none';
+        }
+        if (state.ui?.resultModal) {
+            state.ui.resultModal.style.display = 'none';
+        }
+        // Hide the game board
+        const gameBoard = document.querySelector('.game-board');
+        if (gameBoard) {
+            gameBoard.classList.add('hidden');
+        }
+    });
 
-    state.socket.on('game-end', (data: GameEndData) => {
-        handleGameEnd(data);
+    socket.on('game-end', (data: any) => {
+        handleGameEnd(data, state);
     });
 }
 
-function handleGameEnd(data: GameEndData): void {
-    const gameScreen = document.getElementById('game-screen');
-    if (!gameScreen) return;
+function handleGameEnd(data: any, state: any) {
+    const gameEndModal = document.getElementById('game-over-modal');
+    if (!gameEndModal) return;
 
-    // Find the highest score
-    const highestScore = Math.max(...data.finalScores.map(p => p.score));
-    const highestScorePlayers = data.finalScores.filter(p => p.score === highestScore);
-
-    // Create the game end message
-    const message = document.createElement('div');
-    message.className = 'game-end-message';
-    message.innerHTML = `
-        <h2>Game Over!</h2>
-        <div class="winners">
-            <div class="winner-section">
-                <h3>Last Man Standing</h3>
-                <p>${data.winnerName}</p>
-            </div>
-            <div class="winner-section">
-                <h3>Highest Score</h3>
-                <p>${highestScorePlayers.map(p => p.name).join(', ')} (${highestScore} points)</p>
-            </div>
-        </div>
-        <div class="final-scores">
-            <h3>Final Scores</h3>
-            <ul>
-                ${data.finalScores.map(p => `
-                    <li>${p.name}: ${p.score} points</li>
-                `).join('')}
-            </ul>
-        </div>
-        <button onclick="location.reload()">Play Again</button>
+    // Create the final scores table with spacing
+    let tableContent = `
+        <tr>
+            <th style="padding-right: ${data.columnSpacing?.player || 20}px">PLAYER</th>
+            <th style="padding-right: ${data.columnSpacing?.score || 15}px">SCORE</th>
+            <th style="padding-right: ${data.columnSpacing?.territories || 15}px">TERRITORIES</th>
+            <th style="padding-right: ${data.columnSpacing?.capitol || 15}px">CAPITOL</th>
+        </tr>
     `;
 
-    // Add the message to the game screen
-    gameScreen.appendChild(message);
+    data.finalScores.forEach((score: any) => {
+        const hasCapitol = score.hasCapitol ? '✅' : '❌';
+        tableContent += `
+            <tr>
+                <td style="padding-right: ${data.columnSpacing?.player || 20}px">${score.name}</td>
+                <td style="padding-right: ${data.columnSpacing?.score || 15}px">${score.score}</td>
+                <td style="padding-right: ${data.columnSpacing?.territories || 15}px">${score.territories}</td>
+                <td style="padding-right: ${data.columnSpacing?.capitol || 15}px">${hasCapitol}</td>
+            </tr>
+        `;
+    });
+
+    // Update the content
+    const finalScoresTable = gameEndModal.querySelector('.final-scores-table');
+    if (finalScoresTable) {
+        finalScoresTable.innerHTML = tableContent;
+    }
+
+    // Show winner messages
+    let winnerMessages = '';
+    if (data.conquestWinner) {
+        winnerMessages += `🏰 ${data.conquestWinner.name} HAS WON BY CONQUEST!<br>`;
+    }
+    if (data.scoreWinner) {
+        winnerMessages += `🏆 ${data.scoreWinner.name} HAS WON BY POINTS WITH ${data.scoreWinner.score} POINTS!`;
+    }
+
+    const winnerDisplay = gameEndModal.querySelector('.winner-display');
+    if (winnerDisplay) {
+        winnerDisplay.innerHTML = winnerMessages;
+    }
+
+    // Show the game over modal
+    gameEndModal.style.display = 'block';
 } 

@@ -258,6 +258,71 @@ input[type="text"] {
 .modal-content {
     max-width: 600px;
     width: 100%;
+    background-color: rgba(22, 27, 34, 0.95);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.modal-content.game-over {
+    text-align: center;
+}
+
+.modal-content.game-over h2 {
+    color: var(--gryffindor-gold);
+    font-size: 2em;
+    margin-bottom: 20px;
+}
+
+.winner-announcement {
+    font-size: 1.2em;
+    margin: 15px 0;
+    padding: 10px;
+    background-color: rgba(255, 215, 0, 0.1);
+    border-radius: 4px;
+}
+
+.final-scores {
+    margin: 20px 0;
+}
+
+.final-scores table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+}
+
+.final-scores th,
+.final-scores td {
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.final-scores th {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--gryffindor-gold);
+}
+
+.final-scores tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.modal-content.game-over button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 1.1em;
+    background-color: var(--gryffindor-gold);
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.modal-content.game-over button:hover {
+    transform: scale(1.05);
+    background-color: var(--gryffindor-red);
+    color: #fff;
 }
 
 /* Territory styling */

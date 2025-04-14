@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initializeDuelHandlers(gameState);
         
         // Initialize game end handler
-        initializeGameEndHandler(gameState);
+        initializeGameEndHandler(socket, gameState);
 
         // Initialize lobby handlers
         initializeLobbyHandlers(gameState);

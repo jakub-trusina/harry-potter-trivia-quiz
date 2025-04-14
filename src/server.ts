@@ -29,13 +29,13 @@ app.get('*', (_req, res) => {
 // Game state
 interface Territory {
     id: string;
-    owner: string;
-    isCapitol: boolean;
-    hasSupplyLine: boolean;
-    value: number;
     x: number;
     y: number;
-    shields?: number;
+    owner: string | null;
+    value: number;
+    isCapitol: boolean;
+    shields?: number;  // Number of shields (0-2) for capitols
+    hasSupplyLine?: boolean;  // Whether the territory is connected to a capitol
 }
 
 const gameState: GameState = {
@@ -50,19 +50,108 @@ const questions: Question[] = JSON.parse(
     readFileSync(path.join(projectRoot, 'src', 'data', 'questions.json'), 'utf-8')
 );
 
-// Log basic info about questions loaded
-console.log(`Loaded ${questions.length} questions from JSON file`);
-// Normalize question data to use text property consistently
-questions.forEach(q => {
-    if (q.question && !q.text) {
-        q.text = q.question;
+// Question queues for each difficulty
+interface QuestionQueues {
+    easy: Question[];
+    medium: Question[];
+    hard: Question[];
+}
+
+let questionQueues: QuestionQueues = {
+    easy: [],
+    medium: [],
+    hard: []
+};
+
+function shuffleArray<T>(array: T[]): T[] {
+    const shuffled = [...array]; // Create a copy to not modify the original
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-});
-// Check for any remaining issues
-const questionsWithoutText = questions.filter(q => !q.text);
-if (questionsWithoutText.length > 0) {
-    console.warn(`⚠️ WARNING: ${questionsWithoutText.length} questions have missing 'text' property after normalization`);
-    console.warn(`Example of first problematic question:`, questionsWithoutText[0]);
+    return shuffled;
+}
+
+function initializeQuestionQueues() {
+    console.log('🎲 Initializing question queues...');
+    
+    // Filter questions by difficulty and shuffle each group
+    const easyQuestions = shuffleArray(questions.filter(q => q.difficulty === 'easy'));
+    const mediumQuestions = shuffleArray(questions.filter(q => q.difficulty === 'medium'));
+    const hardQuestions = shuffleArray(questions.filter(q => q.difficulty === 'hard'));
+    
+    questionQueues = {
+        easy: easyQuestions,
+        medium: mediumQuestions,
+        hard: hardQuestions
+    };
+    
+    console.log(`✅ Question queues initialized with:
+        Easy: ${questionQueues.easy.length} questions
+        Medium: ${questionQueues.medium.length} questions
+        Hard: ${questionQueues.hard.length} questions`);
+}
+
+function getNextQuestion(territoryValue: number): Question {
+    // Map territory value to difficulty
+    const difficulty = territoryValue === 3 ? "hard" : 
+                      territoryValue === 2 ? "medium" : "easy";
+    
+    // Get the appropriate queue
+    let queue = questionQueues[difficulty];
+    
+    // If queue is empty, reshuffle all questions of that difficulty
+    if (queue.length === 0) {
+        console.log(`⚠️ ${difficulty} question queue is empty, reshuffling...`);
+        const newQuestions = shuffleArray(questions.filter(q => q.difficulty === difficulty));
+        questionQueues[difficulty] = newQuestions;
+        queue = newQuestions;
+        
+        // If still empty (no questions of this difficulty exist), fall back to any difficulty
+        if (queue.length === 0) {
+            console.warn(`No questions found for difficulty ${difficulty}, falling back to any available questions`);
+            for (const diff of ['easy', 'medium', 'hard'] as const) {
+                if (questionQueues[diff].length > 0) {
+                    queue = questionQueues[diff];
+                    break;
+                }
+            }
+            // If all queues are empty, reinitialize everything
+            if (queue.length === 0) {
+                initializeQuestionQueues();
+                queue = questionQueues[difficulty];
+            }
+        }
+    }
+    
+    // Get the next question from the queue
+    const question = queue.shift()!;
+    
+    // Use question.question as text if text is missing
+    if (!question.text && question.question) {
+        question.text = question.question;
+    } else if (!question.text) {
+        console.warn(`Question ${question.id} is missing both text and question properties`);
+        question.text = `Question ${question.id}`;
+    }
+    
+    return question;
+}
+
+// Initialize question queues when game starts
+function initializeGame() {
+    console.log('🎮 Initializing new game...');
+    
+    // Reset game state
+    gameState.territories = {} as Record<string, Territory>;
+    gameState.players = [];
+    gameState.currentTurn = null;
+    gameState.gameActive = false;
+    
+    // Initialize fresh question queues
+    initializeQuestionQueues();
+    
+    // ... rest of game initialization ...
 }
 
 interface PlayerState {
@@ -96,8 +185,9 @@ interface DuelData {
     correctAnswer?: string;
     timeoutId?: NodeJS.Timeout;
     round?: number;
-    responseTime?: Map<string, number>;
+    responseTime?: Map<string, string>;
     questionSentTime?: number;
+    roundsRequired?: number;
 }
 
 interface ObserverResult {
@@ -117,20 +207,19 @@ interface DuelResult {
     correctAnswer?: string;
     observerResults?: ObserverResult[];
     winner?: string | null;  // Updated to allow null
-    attackerResponseTime?: number;
-    defenderResponseTime?: number;
+    attackerResponseTime?: string;
+    defenderResponseTime?: string;
+    isCapitolRound?: boolean;
+    roundNumber?: number;
+    roundsRequired?: number;
+    continueToNextRound?: boolean;
+    shieldsRemaining?: number;
+    round?: number;
+    totalRounds?: number;
 }
 
 const activeQuestions = new Map<string, DuelData>();
 const activeDuels = new Map<string, DuelData>();
-
-function shuffleArray<T>(array: T[]): T[] {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
-}
 
 function getRandomQuestion(territoryValue: number): Question {
     // Map territory value to difficulty
@@ -148,25 +237,12 @@ function getRandomQuestion(territoryValue: number): Question {
     const randomQuestions = filteredQuestions.length > 0 ? filteredQuestions : questions;
     const question = randomQuestions[Math.floor(Math.random() * randomQuestions.length)];
     
-    // Add fallback text if missing
-    if (!question.text) {
-        console.warn(`Question ${question.id} is missing text property, using fallback`);
-        
-        // Add default text based on the answers available
-        if (question.answers && question.answers.length > 0) {
-            if (question.correctAnswer !== undefined) {
-                const correctAnswerIndex = typeof question.correctAnswer === 'number' 
-                    ? question.correctAnswer 
-                    : question.answers.indexOf(question.correctAnswer);
-                    
-                const correctAnswer = question.answers[correctAnswerIndex] || "Unknown";
-                question.text = `Which of these is correct? The answer is ${correctAnswer}`;
-            } else {
-                question.text = `Select the correct answer from the options below`;
-            }
-        } else {
-            question.text = `Question ${question.id}`;
-        }
+    // Use question.question as text if text is missing
+    if (!question.text && question.question) {
+        question.text = question.question;
+    } else if (!question.text) {
+        console.warn(`Question ${question.id} is missing both text and question properties`);
+        question.text = `Question ${question.id}`;
     }
     
     return question;
@@ -297,32 +373,219 @@ function processDuelResult(result: DuelResult) {
     try {
         const attackerCorrect = result.attackerCorrect;
         const defenderCorrect = result.defenderCorrect ?? false;
+        const territory = gameState.territories[result.territoryId];
         
-        if (!result.defenderId || result.type === 'unclaimed') {
-            result.winner = attackerCorrect ? 'attacker' : null;
-        } else {
-            if (attackerCorrect && !defenderCorrect) {
-                result.winner = 'attacker';
-            } else if (!attackerCorrect && defenderCorrect) {
-                result.winner = 'defender';
-            } else if (attackerCorrect && defenderCorrect) {
-                // Both correct - compare response times
-                const attackerTime = result.attackerResponseTime || Infinity;
-                const defenderTime = result.defenderResponseTime || Infinity;
-                result.winner = attackerTime <= defenderTime ? 'attacker' : 'defender';
-            } else {
-                result.winner = null;
-            }
+        if (!territory) {
+            console.error('❌ Territory not found:', result.territoryId);
+            return;
         }
 
-        // Update territory ownership and supply lines synchronously
-        if (result.winner === 'attacker') {
-            const territory = gameState.territories[result.territoryId];
-            if (!territory) {
-                console.error('❌ Territory not found:', result.territoryId);
+        // Handle capitol territory differently
+        if (territory.isCapitol) {
+            const duelData = activeQuestions.get(result.attackerId);
+            if (!duelData) {
+                console.error('❌ No duel data found for capitol attack');
                 return;
             }
 
+            // Determine round winner based on correctness and response time
+            if (attackerCorrect || defenderCorrect) {
+                if (attackerCorrect && !defenderCorrect) {
+                    result.winner = 'attacker';
+                } else if (!attackerCorrect && defenderCorrect) {
+                    result.winner = 'defender';
+                } else if (attackerCorrect && defenderCorrect) {
+                    // Both correct - compare response times
+                    const attackerTime = parseFloat(result.attackerResponseTime?.replace('s', '') || 'Infinity');
+                    const defenderTime = parseFloat(result.defenderResponseTime?.replace('s', '') || 'Infinity');
+                    result.winner = attackerTime <= defenderTime ? 'attacker' : 'defender';
+                }
+            } else {
+                // If both wrong, defender wins by default
+                result.winner = 'defender';
+            }
+
+            // Add round information to result
+            result.isCapitolRound = true;
+            result.roundNumber = duelData.round;
+            result.roundsRequired = duelData.roundsRequired;
+
+            console.log(`Capitol duel - Shields remaining: ${territory.shields || 0}`, {
+                attackerCorrect,
+                defenderCorrect,
+                attackerTime: result.attackerResponseTime,
+                defenderTime: result.defenderResponseTime,
+                winner: result.winner
+            });
+
+            // If attacker wins, reduce shields
+            if (result.winner === 'attacker') {
+                if (territory.shields && territory.shields > 0) {
+                    territory.shields--;
+                    console.log(`Reduced shields to ${territory.shields}`);
+                    
+                    // Emit territory update to update UI
+                    io.emit('game-state-update', {
+                        territories: gameState.territories,
+                        players: gameState.players,
+                        currentTurn: gameState.currentTurn
+                    });
+
+                    // Automatically start next round after shield reduction
+                    console.log('Starting next round automatically after shield reduction');
+                    
+                    // Keep the same duel data but prepare for next round
+                    duelData.round = (duelData.round || 1) + 1;
+                    duelData.answers = new Map();
+                    duelData.observerAnswers = new Map();
+                    duelData.responseTime = new Map();
+                    
+                    // Emit current result with continueToNextRound flag and shields info
+                    result.continueToNextRound = true;
+                    result.shieldsRemaining = territory.shields;
+                    io.emit('duel-result', result);
+                    
+                    // Start next round after a delay
+                    setTimeout(() => {
+                        // First, reinitialize duel UI for both players
+                        io.to(result.attackerId).emit('duel-started', { 
+                            role: 'attacker',
+                            isCapitolRound: true,
+                            round: duelData.round,
+                            totalRounds: duelData.roundsRequired,
+                            shieldsRemaining: territory.shields
+                        });
+                        
+                        if (result.defenderId) {
+                            io.to(result.defenderId).emit('duel-started', { 
+                                role: 'defender',
+                                isCapitolRound: true,
+                                round: duelData.round,
+                                totalRounds: duelData.roundsRequired,
+                                shieldsRemaining: territory.shields
+                            });
+                        }
+
+                        // Wait a short moment for clients to prepare their UI
+                        setTimeout(() => {
+                            // Get new question from the queue
+                            const newQuestion = getNextQuestion(territory.value);
+                            duelData.currentQuestion = newQuestion;
+                            duelData.questionSentTime = Date.now();
+                            
+                            console.log(`Starting capitol duel round ${duelData.round} - Shields remaining: ${territory.shields}`);
+                            
+                            // Send new question to both participants
+                            io.to(result.attackerId).emit('question', {
+                                question: newQuestion.text,
+                                answers: newQuestion.answers,
+                                role: 'attacker',
+                                shieldsRemaining: territory.shields,
+                                isCapitolRound: true,
+                                round: duelData.round,
+                                totalRounds: duelData.roundsRequired
+                            });
+                            
+                            if (result.defenderId) {
+                                io.to(result.defenderId).emit('question', {
+                                    question: newQuestion.text,
+                                    answers: newQuestion.answers,
+                                    role: 'defender',
+                                    shieldsRemaining: territory.shields,
+                                    isCapitolRound: true,
+                                    round: duelData.round,
+                                    totalRounds: duelData.roundsRequired
+                                });
+                            }
+                            
+                            // Set timeout for this round
+                            if (duelData.timeoutId) {
+                                clearTimeout(duelData.timeoutId);
+                            }
+                            duelData.timeoutId = setTimeout(() => {
+                                if (duelData.isActive) {
+                                    console.log('Round timed out, defender wins by default');
+                                    const timeoutResult: DuelResult = {
+                                        type: 'claimed',
+                                        attackerCorrect: false,
+                                        defenderCorrect: false,
+                                        attackerId: result.attackerId,
+                                        defenderId: result.defenderId,
+                                        territoryId: result.territoryId,
+                                        winner: 'defender',
+                                        isCapitolRound: true,
+                                        shieldsRemaining: territory.shields,
+                                        round: duelData.round,
+                                        totalRounds: duelData.roundsRequired
+                                    };
+                                    processDuelResult(timeoutResult);
+                                }
+                            }, 30000); // 30 seconds for capitol battles
+                        }, 1000); // Wait 1 second after duel-started before sending question
+                    }, 5000); // 5 second delay between rounds
+                    return;
+                }
+            }
+
+            // Check if we need another round
+            if (result.winner === 'attacker' && duelData.round && duelData.roundsRequired && 
+                duelData.round < duelData.roundsRequired) {
+                // This block is now handled in the shield reduction section above
+                return;
+            }
+
+            // If defender won or this was the final round, proceed with territory update
+            if (result.winner === 'defender' || (duelData.round === duelData.roundsRequired)) {
+                // Clean up timeouts
+                if (duelData.timeoutId) {
+                    clearTimeout(duelData.timeoutId);
+                    duelData.timeoutId = undefined;
+                }
+                
+                // Emit result before cleaning up
+                result.shieldsRemaining = territory.shields || 0;
+                io.emit('duel-result', result);
+                
+                // Clean up active questions for BOTH players
+                activeQuestions.delete(result.attackerId);
+                if (result.defenderId) {
+                    activeQuestions.delete(result.defenderId);
+                }
+
+                // If attacker won all rounds, update territory ownership
+                if (result.winner === 'attacker' && duelData.round === duelData.roundsRequired) {
+                    // Process territory capture
+                    handleTerritoryCapture(result, territory);
+                } else {
+                    // Defender won, move to next turn
+                    setTimeout(() => {
+                        nextTurn();
+                    }, 5000);
+                }
+                return;
+            }
+        } else {
+            // Normal territory logic
+            if (!result.defenderId || result.type === 'unclaimed') {
+                result.winner = attackerCorrect ? 'attacker' : null;
+            } else {
+                if (attackerCorrect && !defenderCorrect) {
+                    result.winner = 'attacker';
+                } else if (!attackerCorrect && defenderCorrect) {
+                    result.winner = 'defender';
+                } else if (attackerCorrect && defenderCorrect) {
+                    // Both correct - compare response times
+                    const attackerTime = result.attackerResponseTime || Infinity;
+                    const defenderTime = result.defenderResponseTime || Infinity;
+                    result.winner = attackerTime <= defenderTime ? 'attacker' : 'defender';
+                } else {
+                    result.winner = null;
+                }
+            }
+        }
+
+        // Update territory ownership and supply lines
+        if (result.winner === 'attacker') {
             try {
                 // First update the defender's territories and supply lines
                 if (territory.owner) {
@@ -344,56 +607,76 @@ function processDuelResult(result: DuelResult) {
                             }
 
                             // Update all players' supply lines after ownership change
-                            const supplyLineUpdates = Promise.all(
-                                gameState.players.map(player => updateSupplyLines(player.id))
-                            );
+                            Promise.all(gameState.players.map(player => updateSupplyLines(player.id)))
+                                .then(() => {
+                                    // Check if defender has lost all capitols
+                                    const defenderHasCapitols = Object.values(gameState.territories).some(t => 
+                                        t.owner === defender.id && t.isCapitol
+                                    );
 
-                            // Wait for all supply line updates to complete before emitting result
-                            supplyLineUpdates.then(() => {
-                                // Emit result to all players
-                                io.emit('duel-result', result);
-                                
-                                // Clean up active questions
-                                activeQuestions.delete(result.attackerId);
-                                if (result.defenderId) {
-                                    activeQuestions.delete(result.defenderId);
-                                }
-                                
-                                // Move to next player's turn after a short delay
-                                setTimeout(() => {
-                                    nextTurn();
-                                }, 5000);
-                            });
+                                    if (!defenderHasCapitols && defender.territories.length > 0) {
+                                        // Defender lost all capitols but still has territories
+                                        // Transfer all remaining territories to the attacker
+                                        const remainingTerritories = Object.values(gameState.territories)
+                                            .filter(t => t.owner === defender.id);
+
+                                        remainingTerritories.forEach(t => {
+                                            t.owner = result.attackerId;
+                                            defender.territories = defender.territories.filter(id => id !== t.id);
+                                            if (!attacker.territories.includes(t.id)) {
+                                                attacker.territories.push(t.id);
+                                            }
+                                        });
+
+                                        // Add log entry about territory transfer
+                                        console.log(`🏰 ${defender.name} lost all capitols. ${remainingTerritories.length} territories transferred to ${attacker.name}`);
+                                    }
+
+                                    // Check if game is over (only one player has capitols)
+                                    const playersWithCapitols = gameState.players.filter(p => 
+                                        Object.values(gameState.territories).some(t => 
+                                            t.owner === p.id && t.isCapitol
+                                        )
+                                    );
+
+                                    const gameOver = playersWithCapitols.length === 1;
+                                    
+                                    // Emit game state update first
+                                    io.emit('game-state-update', {
+                                        territories: gameState.territories,
+                                        players: gameState.players,
+                                        currentTurn: gameState.currentTurn
+                                    });
+                                    
+                                    // Then emit duel result
+                                    io.emit('duel-result', result);
+                                    
+                                    // Clean up active questions
+                                    activeQuestions.delete(result.attackerId);
+                                    if (result.defenderId) {
+                                        activeQuestions.delete(result.defenderId);
+                                    }
+                                    
+                                    if (gameOver) {
+                                        endGame();
+                                    } else if (!territory.isCapitol || result.roundNumber === result.roundsRequired) {
+                                        // Move to next player's turn after a delay, but only if:
+                                        // - It's not a capitol territory, OR
+                                        // - It's the final round of a capitol battle
+                                        setTimeout(() => {
+                                            nextTurn();
+                                        }, 5000);
+                                    }
+                                });
                         });
                     }
-                } else {
-                    // If territory was unclaimed, simply update attacker's ownership
-                    territory.owner = result.attackerId;
-                    const attacker = gameState.players.find(p => p.id === result.attackerId);
-                    if (!attacker) {
-                        console.error('❌ Attacker not found:', result.attackerId);
-                        return;
-                    }
-
-                    if (!attacker.territories.includes(result.territoryId)) {
-                        attacker.territories.push(result.territoryId);
-                    }
-
-                    // Update supply lines and emit result
-                    updateSupplyLines(result.attackerId).then(() => {
-                        io.emit('duel-result', result);
-                        activeQuestions.delete(result.attackerId);
-                        setTimeout(() => {
-                            nextTurn();
-                        }, 5000);
-                    });
                 }
             } catch (error) {
                 console.error('❌ Error updating territory ownership:', error);
                 return;
             }
         } else {
-            // If no ownership change, just emit the result
+            // If defender wins, move to next turn
             io.emit('duel-result', result);
             activeQuestions.delete(result.attackerId);
             if (result.defenderId) {
@@ -406,6 +689,68 @@ function processDuelResult(result: DuelResult) {
     } finally {
         releaseDuelLock(duelId);
     }
+}
+
+function checkGameOver(): boolean {
+    // Count how many players still have at least one capitol
+    const playersWithCapitols = gameState.players.filter(player => 
+        Object.values(gameState.territories).some(t => 
+            t.owner === player.id && t.isCapitol
+        )
+    );
+
+    // Game is over when only one player has capitols
+    return playersWithCapitols.length === 1;
+}
+
+function endGame(): void {
+    gameState.gameActive = false;
+
+    // Calculate final scores and include territory counts
+    const finalScores = gameState.players.map(player => ({
+        name: player.name,
+        id: player.id,
+        score: player.score || 0,
+        territories: player.territories.length,
+        hasCapitol: Object.values(gameState.territories).some(t => 
+            t.owner === player.id && t.isCapitol
+        )
+    }));
+
+    // Sort by score (highest first)
+    finalScores.sort((a, b) => b.score - a.score);
+
+    // Find the last player with a capitol (winner by conquest)
+    const conquestWinner = gameState.players.find(player => 
+        Object.values(gameState.territories).some(t => 
+            t.owner === player.id && t.isCapitol
+        )
+    );
+
+    // First emit a close-all-modals event
+    io.emit('close-all-modals');
+
+    // Wait a moment for modals to close, then show game over
+    setTimeout(() => {
+        // Emit game end event with results
+        io.emit('game-end', {
+            scores: finalScores,  // Include both scores and finalScores for backward compatibility
+            finalScores: finalScores,
+            conquestWinner: conquestWinner ? {
+                name: conquestWinner.name,
+                id: conquestWinner.id
+            } : null,
+            scoreWinner: finalScores[0],
+            columnSpacing: {  // Add spacing information for the table
+                player: 20,   // Minimum width for player name column
+                score: 15,    // Minimum width for score column
+                territories: 15,  // Minimum width for territories column
+                capitol: 15   // Minimum width for capitol column
+            }
+        });
+        
+        console.log('Game ended with scores:', finalScores);
+    }, 2000); // Wait 2 seconds before showing game over screen
 }
 
 // Helper function to get adjacent territory IDs
@@ -935,6 +1280,27 @@ function processDuelResults(duel: DuelData): void {
         ? duel.currentQuestion.answers[duel.currentQuestion.correctAnswer] 
         : String(duel.currentQuestion.correctAnswer);
     
+    // Update scores based on correct answers
+    const attacker = gameState.players.find(p => p.id === duel.attackerId);
+    const defender = gameState.players.find(p => p.id === duel.defenderId);
+    
+    if (attacker && attackerAnswer) {
+        attacker.score = (attacker.score || 0) + 10;
+    }
+    if (defender && defenderAnswer) {
+        defender.score = (defender.score || 0) + 10;
+    }
+    
+    // Update observer scores
+    Array.from(duel.observerAnswers.entries()).forEach(([observerId, correct]) => {
+        if (correct) {
+            const observer = gameState.players.find(p => p.id === observerId);
+            if (observer) {
+                observer.score = (observer.score || 0) + 10;
+            }
+        }
+    });
+    
     const result: DuelResult = {
         type: 'claimed',
         attackerCorrect: attackerAnswer,
@@ -949,13 +1315,92 @@ function processDuelResults(duel: DuelData): void {
             playerId: observerId,
             answer: answer ? correctAnswerString : '',
             correct: answer,
-            responseTime: duel.responseTime?.get(observerId),
             scoreGained: answer ? 10 : 0
         }))
     };
     
     processDuelResult(result);
     activeDuels.delete(`${duel.attackerId}-${duel.defenderId}`);
+}
+
+function handleTerritoryCapture(result: DuelResult, territory: Territory): void {
+    // Check if territory has an owner
+    if (!territory.owner || typeof territory.owner !== 'string') {
+        console.error('❌ Territory has no valid owner');
+        return;
+    }
+
+    const defender = gameState.players.find(p => p.id === territory.owner);
+    const attacker = gameState.players.find(p => p.id === result.attackerId);
+
+    if (!defender || !attacker) {
+        console.error('❌ Could not find attacker or defender for territory capture');
+        return;
+    }
+
+    // Remove territory from defender
+    defender.territories = defender.territories.filter(t => t !== result.territoryId);
+    
+    // Update defender's supply lines
+    updateSupplyLines(defender.id).then(() => {
+        // Update territory ownership
+        territory.owner = result.attackerId;
+        
+        // Add territory to attacker
+        if (!attacker.territories.includes(result.territoryId)) {
+            attacker.territories.push(result.territoryId);
+        }
+
+        // Update all players' supply lines
+        Promise.all(gameState.players.map(player => updateSupplyLines(player.id)))
+            .then(() => {
+                // Check if defender has lost all capitols
+                const defenderHasCapitols = Object.values(gameState.territories).some(t => 
+                    t.owner === defender.id && t.isCapitol
+                );
+
+                if (!defenderHasCapitols && defender.territories.length > 0) {
+                    // Transfer remaining territories to attacker
+                    const remainingTerritories = Object.values(gameState.territories)
+                        .filter(t => t.owner === defender.id);
+
+                    remainingTerritories.forEach(t => {
+                        t.owner = result.attackerId;
+                        defender.territories = defender.territories.filter(id => id !== t.id);
+                        if (!attacker.territories.includes(t.id)) {
+                            attacker.territories.push(t.id);
+                        }
+                    });
+
+                    console.log(`🏰 ${defender.name} lost all capitols. ${remainingTerritories.length} territories transferred to ${attacker.name}`);
+                }
+
+                // Check if game is over
+                const playersWithCapitols = gameState.players.filter(p => 
+                    Object.values(gameState.territories).some(t => 
+                        t.owner === p.id && t.isCapitol
+                    )
+                );
+
+                const gameOver = playersWithCapitols.length === 1;
+
+                // Emit game state update
+                io.emit('game-state-update', {
+                    territories: gameState.territories,
+                    players: gameState.players,
+                    currentTurn: gameState.currentTurn
+                });
+
+                if (gameOver) {
+                    endGame();
+                } else {
+                    // Move to next turn
+                    setTimeout(() => {
+                        nextTurn();
+                    }, 5000);
+                }
+            });
+    });
 }
 
 // Socket.IO event handlers
@@ -1095,7 +1540,9 @@ io.on('connection', (socket) => {
             answers: new Map<string, boolean>(),
             observerAnswers: new Map<string, boolean>(),
             isActive: true,
-            round: territory.isCapitol ? 1 : 0
+            round: territory.isCapitol ? 1 : undefined,
+            roundsRequired: territory.isCapitol ? (territory.shields || 0) + 1 : undefined,
+            responseTime: new Map()
         };
 
         // Store the duel data
@@ -1112,9 +1559,12 @@ io.on('connection', (socket) => {
 
         // Wait a short moment for clients to prepare their UI
         setTimeout(() => {
-            // Get a random question
-            const question = getRandomQuestion(territory.value);
+            // Get a question from the queue
+            const question = getNextQuestion(territory.value);
             duelData.currentQuestion = question;
+            
+            // Set the question sent time
+            duelData.questionSentTime = Date.now();
             
             // For debugging
             console.log("Question to be emitted:", {
@@ -1122,7 +1572,10 @@ io.on('connection', (socket) => {
                 text: question.text,
                 correctAnswer: question.correctAnswer,
                 difficulty: question.difficulty,
-                answersCount: question.answers.length
+                answersCount: question.answers.length,
+                isCapitol: territory.isCapitol,
+                round: duelData.round,
+                roundsRequired: duelData.roundsRequired
             });
 
             // Emit question to attacker with fixed structure
@@ -1175,7 +1628,7 @@ io.on('connection', (socket) => {
                     };
                     processDuelResult(result);
                 }
-            }, 20000); // 20 seconds timeout
+            }, 20000);
         }, 1000); // Wait 1 second before sending questions
     });
 
@@ -1196,8 +1649,11 @@ io.on('connection', (socket) => {
             duel.responseTime = new Map();
         }
 
-        // Calculate response time (time since question was sent)
-        const responseTime = duel.questionSentTime ? (Date.now() - duel.questionSentTime) / 1000 : 0; // Convert to seconds
+        // Calculate response time
+        const responseTimeMs = duel.questionSentTime ? Date.now() - duel.questionSentTime : 0;
+        const responseTime = (responseTimeMs / 1000).toFixed(1) + 's';
+        
+        // Store response time
         duel.responseTime.set(playerId, responseTime);
         
         // Helper function to normalize strings for comparison
@@ -1307,7 +1763,7 @@ io.on('connection', (socket) => {
         io.to(defenderId).emit('duel-started', { role: 'defender' });
         
         // Get a random question and send it
-        const question = getRandomQuestion(gameState.territories[territory].value);
+        const question = getNextQuestion(gameState.territories[territory].value);
         duelData.currentQuestion = question;
         
         // For debugging

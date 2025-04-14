@@ -129,7 +129,7 @@ function showQuestionDialog(data: DuelQuestion, state: GameStateManager): void {
 }
 
 export function cleanupModalState(state: GameStateManager): void {
-    if (!state.currentModalState.timer) return;
+    if (!state.currentModalState?.timer) return;
 
     clearInterval(state.currentModalState.timer);
     updateModalState(state, {
@@ -139,11 +139,13 @@ export function cleanupModalState(state: GameStateManager): void {
     });
 
     const modal = document.getElementById('quiz-modal');
+    const questionContainer = document.getElementById('question-container');
     const duelResult = document.getElementById('duel-result');
     const observerResponses = document.getElementById('observer-responses');
     const observerAnswers = document.getElementById('observer-answers-container');
 
     if (modal) modal.classList.add('hidden');
+    if (questionContainer) questionContainer.classList.add('hidden');
     if (duelResult) duelResult.classList.add('hidden');
     if (observerResponses) observerResponses.classList.add('hidden');
     if (observerAnswers) observerAnswers.innerHTML = '';
@@ -152,11 +154,12 @@ export function cleanupModalState(state: GameStateManager): void {
 function handleDuelResult(result: DuelResult, state: GameStateManager): void {
     try {
         const modal = document.getElementById('quiz-modal');
+        const questionContainer = document.getElementById('question-container');
         const duelResult = document.getElementById('duel-result');
         const observerResponses = document.getElementById('observer-responses');
         const observerAnswers = document.getElementById('observer-answers-container');
         
-        if (!modal || !duelResult || !observerResponses || !observerAnswers) {
+        if (!modal || !duelResult || !observerResponses || !observerAnswers || !questionContainer) {
             console.error('❌ Required modal elements not found for duel result');
             return;
         }
@@ -164,7 +167,8 @@ function handleDuelResult(result: DuelResult, state: GameStateManager): void {
         // Clean up any existing modal state
         cleanupModalState(state);
         
-        // Show duel result
+        // Hide question container and show duel result
+        questionContainer.classList.add('hidden');
         duelResult.classList.remove('hidden');
         
         // Get player names
@@ -197,7 +201,7 @@ function handleDuelResult(result: DuelResult, state: GameStateManager): void {
         resultHTML += `
             <div class="player-result ${result.attackerCorrect ? 'correct' : 'incorrect'}">
                 ${attacker.name}: ${result.attackerCorrect ? 'Correct' : 'Incorrect'}
-                ${result.attackerResponseTime ? ` (${result.attackerResponseTime.toFixed(2)}s)` : ''}
+                ${result.attackerResponseTime !== undefined ? ` (${result.attackerResponseTime})` : ''}
             </div>
         `;
 
@@ -205,7 +209,7 @@ function handleDuelResult(result: DuelResult, state: GameStateManager): void {
             resultHTML += `
                 <div class="player-result ${result.defenderCorrect ? 'correct' : 'incorrect'}">
                     ${defender.name}: ${result.defenderCorrect ? 'Correct' : 'Incorrect'}
-                    ${result.defenderResponseTime ? ` (${result.defenderResponseTime.toFixed(2)}s)` : ''}
+                    ${result.defenderResponseTime !== undefined ? ` (${result.defenderResponseTime})` : ''}
                 </div>
             `;
         }
@@ -219,7 +223,7 @@ function handleDuelResult(result: DuelResult, state: GameStateManager): void {
                     resultHTML += `
                         <div class="observer-result ${observerResult.correct ? 'correct' : 'incorrect'}">
                             ${observer.name}: ${observerResult.correct ? 'Correct' : 'Incorrect'}
-                            ${observerResult.responseTime ? ` (${observerResult.responseTime.toFixed(2)}s)` : ''}
+                            ${observerResult.responseTime !== undefined ? ` (${observerResult.responseTime})` : ''}
                             ${observerResult.scoreGained ? ` (+${observerResult.scoreGained} points)` : ''}
                         </div>
                     `;
@@ -243,11 +247,14 @@ function handleDuelResult(result: DuelResult, state: GameStateManager): void {
         resultHTML += '</div>';
         duelResult.innerHTML = resultHTML;
 
-        // Show the modal
+        // Show the modal with results
         modal.classList.remove('hidden');
+        duelResult.classList.remove('hidden');
 
         // Auto-hide after 5 seconds
         setTimeout(() => {
+            modal.classList.add('hidden');
+            duelResult.classList.add('hidden');
             cleanupModalState(state);
         }, 5000);
     } catch (error) {
