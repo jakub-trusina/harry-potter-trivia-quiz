@@ -1,3 +1,5 @@
+import { UIElements } from './ui.js';
+
 export interface Territory {
     id: string;
     x: number;
@@ -11,12 +13,15 @@ export interface Territory {
 
 export interface Player {
     id: string;
+    socketId: string;
     name: string;
     territories: string[];
     score: number;
     eliminated: boolean;
     house?: 'Gryffindor' | 'Slytherin' | 'Ravenclaw' | 'Hufflepuff';  // Make house optional
     supplyLines: { from: string; to: string }[];
+    isHost?: boolean;
+    disconnected?: boolean;
 }
 
 export interface Question {
@@ -48,6 +53,7 @@ export interface DuelResult {
 }
 
 export interface GameState {
+    ui?: UIElements;
     territories: { [key: string]: Territory };
     players: Player[];
     currentTurn: string | null;

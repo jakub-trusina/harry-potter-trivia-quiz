@@ -965,10 +965,36 @@ io.on('connection', (socket) => {
 
     socket.on('join-game', (playerName: string) => {
         console.log(`🧙‍♂️ Player "${playerName}" (${socket.id}) is trying to join the game`);
-        console.log('📝 Current game state:', gameState);
         
+        // Check if a player with this name already exists
+        const existingPlayer = gameState.players.find(p => p.name === playerName);
+        if (existingPlayer) {
+            // If the player exists but with a different socket ID, they might have refreshed
+            if (existingPlayer.socketId !== socket.id) {
+                // Update their socket ID
+                existingPlayer.socketId = socket.id;
+                existingPlayer.id = socket.id; // Update main ID as well since we use it for game logic
+                console.log(`🔄 Updated socket ID for existing player ${playerName}`);
+                
+                // Send the current game state to the reconnected player
+                socket.emit('player-list-update', gameState.players);
+                if (gameState.gameActive) {
+                    socket.emit('game-state-update', {
+                        territories: gameState.territories,
+                        players: gameState.players,
+                        currentTurn: gameState.currentTurn
+                    });
+                }
+                return;
+            }
+            // If they have the same socket ID, this is a duplicate join attempt
+            console.log(`❌ Player ${playerName} already exists in the game`);
+            return;
+        }
+
         const newPlayer: Player = {
             id: socket.id,
+            socketId: socket.id,
             name: playerName,
             territories: [],
             score: 0,
@@ -989,13 +1015,22 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        const playerIndex = gameState.players.findIndex(p => p.id === socket.id);
+        // Find the player by socket ID
+        const playerIndex = gameState.players.findIndex(p => p.socketId === socket.id);
         if (playerIndex !== -1) {
             const player = gameState.players[playerIndex];
             console.log(`👋 Player "${player.name}" (${socket.id}) disconnected`);
-            gameState.players.splice(playerIndex, 1);
-            io.emit('player-list-update', gameState.players);
-            console.log('📝 Updated player list after disconnect:', gameState.players.map(p => `${p.name} (${p.id})`));
+            
+            // If the game hasn't started yet, remove them from the game
+            if (!gameState.gameActive) {
+                gameState.players.splice(playerIndex, 1);
+                io.emit('player-list-update', gameState.players);
+                console.log('📝 Updated player list after disconnect:', gameState.players.map(p => `${p.name} (${p.id})`));
+            } else {
+                // If the game is active, mark them as disconnected but don't remove them
+                player.disconnected = true;
+                io.emit('player-disconnected', { playerId: player.id, playerName: player.name });
+            }
         } else {
             console.log('👋 Unknown socket disconnected:', socket.id);
         }
@@ -1295,6 +1330,35 @@ io.on('connection', (socket) => {
             answers: question.answers,
             role: 'defender'
         });
+    });
+
+    socket.on('reconnect-session', (data: { playerId: string, playerName: string }) => {
+        console.log(`Attempting to reconnect player ${data.playerName} (${data.playerId})`);
+        
+        // Check if the player exists in any active game
+        const existingPlayer = gameState.players.find(p => p.id === data.playerId);
+        
+        if (existingPlayer) {
+            // Reconnect the player
+            existingPlayer.socketId = socket.id;
+            socket.emit('reconnection-successful', { 
+                playerId: existingPlayer.id, 
+                playerName: existingPlayer.name 
+            });
+            
+            // If there's an active game, send the current state
+            if (gameState.gameActive) {
+                socket.emit('game-state-update', {
+                    territories: gameState.territories,
+                    players: gameState.players
+                });
+            }
+            
+            console.log(`Player ${data.playerName} reconnected successfully`);
+        } else {
+            socket.emit('reconnection-failed');
+            console.log(`Failed to reconnect player ${data.playerName} - session not found`);
+        }
     });
 });
 

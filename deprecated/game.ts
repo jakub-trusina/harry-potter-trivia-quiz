@@ -1,8 +1,8 @@
 // Types for Socket.IO client
 declare const io: any;
 
-import { Territory, Player, Question, GameState } from './types/game.js';
-import { getHouseFromName, moveModalsToBody, debugDuel } from './utils/helpers.js';
+import { Territory, Player, GameState } from './types/game.js';
+import { debugDuel } from './utils/helpers.js';
 
 // Add this interface at the top of the file where other interfaces are defined
 

@@ -4,8 +4,18 @@
     "module": "ES2020",
     "outDir": "./dist/public/js",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "rootDir": "./src"
   },
-  "include": ["src/game.ts", "src/types/**/*", "src/utils/**/*"],
-  "exclude": ["src/server.ts", "node_modules", "dist"]
+  "include": [
+    "src/client/**/*",
+    "src/types/**/*",
+    "src/utils/**/*"
+  ],
+  "exclude": [
+    "src/server.ts",
+    "src/server/**/*",
+    "node_modules",
+    "dist"
+  ]
 } 
