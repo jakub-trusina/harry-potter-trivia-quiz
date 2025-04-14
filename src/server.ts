@@ -92,6 +92,25 @@ function initializeQuestionQueues() {
         Hard: ${questionQueues.hard.length} questions`);
 }
 
+function shuffleAnswers(question: Question): Question {
+    // Create a copy of the question to avoid modifying the original
+    const shuffledQuestion = { ...question };
+    
+    // If the correct answer is a number (index), we need to track the original answer
+    if (typeof question.correctAnswer === 'number') {
+        const correctAnswer = question.answers[question.correctAnswer];
+        // Shuffle the answers
+        shuffledQuestion.answers = shuffleArray([...question.answers]);
+        // Find the new index of the correct answer
+        shuffledQuestion.correctAnswer = shuffledQuestion.answers.indexOf(correctAnswer);
+    } else {
+        // For string answers, just shuffle the array
+        shuffledQuestion.answers = shuffleArray([...question.answers]);
+    }
+    
+    return shuffledQuestion;
+}
+
 function getNextQuestion(territoryValue: number): Question {
     // Map territory value to difficulty
     const difficulty = territoryValue === 3 ? "hard" : 
@@ -135,7 +154,36 @@ function getNextQuestion(territoryValue: number): Question {
         question.text = `Question ${question.id}`;
     }
     
-    return question;
+    // Shuffle the answers before returning
+    return shuffleAnswers(question);
+}
+
+function getRandomQuestion(territoryValue: number): Question {
+    // Map territory value to difficulty
+    const difficulty = territoryValue === 3 ? "hard" : 
+                      territoryValue === 2 ? "medium" : "easy";
+    
+    const filteredQuestions = questions.filter(q => q.difficulty === difficulty);
+    
+    // If no questions found for the difficulty, fall back to any question
+    if (filteredQuestions.length === 0) {
+        console.warn(`No questions found for difficulty ${difficulty}, falling back to any question`);
+    }
+    
+    // Get a random question
+    const randomQuestions = filteredQuestions.length > 0 ? filteredQuestions : questions;
+    const question = randomQuestions[Math.floor(Math.random() * randomQuestions.length)];
+    
+    // Use question.question as text if text is missing
+    if (!question.text && question.question) {
+        question.text = question.question;
+    } else if (!question.text) {
+        console.warn(`Question ${question.id} is missing both text and question properties`);
+        question.text = `Question ${question.id}`;
+    }
+    
+    // Shuffle the answers before returning
+    return shuffleAnswers(question);
 }
 
 // Initialize question queues when game starts
@@ -220,33 +268,6 @@ interface DuelResult {
 
 const activeQuestions = new Map<string, DuelData>();
 const activeDuels = new Map<string, DuelData>();
-
-function getRandomQuestion(territoryValue: number): Question {
-    // Map territory value to difficulty
-    const difficulty = territoryValue === 3 ? "hard" : 
-                      territoryValue === 2 ? "medium" : "easy";
-    
-    const filteredQuestions = questions.filter(q => q.difficulty === difficulty);
-    
-    // If no questions found for the difficulty, fall back to any question
-    if (filteredQuestions.length === 0) {
-        console.warn(`No questions found for difficulty ${difficulty}, falling back to any question`);
-    }
-    
-    // Get a random question
-    const randomQuestions = filteredQuestions.length > 0 ? filteredQuestions : questions;
-    const question = randomQuestions[Math.floor(Math.random() * randomQuestions.length)];
-    
-    // Use question.question as text if text is missing
-    if (!question.text && question.question) {
-        question.text = question.question;
-    } else if (!question.text) {
-        console.warn(`Question ${question.id} is missing both text and question properties`);
-        question.text = `Question ${question.id}`;
-    }
-    
-    return question;
-}
 
 // Helper function to check if a territory is connected to a capitol
 function checkSupplyLine(territoryId: string, playerId: string): boolean {
