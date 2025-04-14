@@ -447,7 +447,7 @@ function processDuelResult(result: DuelResult) {
                     
                     // Start next round after a delay
                     setTimeout(() => {
-                        // First, reinitialize duel UI for both players
+                        // First, reinitialize duel UI for all participants
                         io.to(result.attackerId).emit('duel-started', { 
                             role: 'attacker',
                             isCapitolRound: true,
@@ -466,6 +466,17 @@ function processDuelResult(result: DuelResult) {
                             });
                         }
 
+                        // Also reinitialize for observers
+                        duelData.observers.forEach(observerId => {
+                            io.to(observerId).emit('duel-started', {
+                                role: 'observer',
+                                isCapitolRound: true,
+                                round: duelData.round,
+                                totalRounds: duelData.roundsRequired,
+                                shieldsRemaining: territory.shields
+                            });
+                        });
+
                         // Wait a short moment for clients to prepare their UI
                         setTimeout(() => {
                             // Get new question from the queue
@@ -475,7 +486,7 @@ function processDuelResult(result: DuelResult) {
                             
                             console.log(`Starting capitol duel round ${duelData.round} - Shields remaining: ${territory.shields}`);
                             
-                            // Send new question to both participants
+                            // Send new question to all participants
                             io.to(result.attackerId).emit('question', {
                                 question: newQuestion.text,
                                 answers: newQuestion.answers,
@@ -497,6 +508,19 @@ function processDuelResult(result: DuelResult) {
                                     totalRounds: duelData.roundsRequired
                                 });
                             }
+
+                            // Send question to observers
+                            duelData.observers.forEach(observerId => {
+                                io.to(observerId).emit('question', {
+                                    question: newQuestion.text,
+                                    answers: newQuestion.answers,
+                                    role: 'observer',
+                                    shieldsRemaining: territory.shields,
+                                    isCapitolRound: true,
+                                    round: duelData.round,
+                                    totalRounds: duelData.roundsRequired
+                                });
+                            });
                             
                             // Set timeout for this round
                             if (duelData.timeoutId) {
@@ -516,11 +540,12 @@ function processDuelResult(result: DuelResult) {
                                         isCapitolRound: true,
                                         shieldsRemaining: territory.shields,
                                         round: duelData.round,
-                                        totalRounds: duelData.roundsRequired
+                                        totalRounds: duelData.roundsRequired,
+                                        continueToNextRound: false
                                     };
                                     processDuelResult(timeoutResult);
                                 }
-                            }, 30000); // 30 seconds for capitol battles
+                            }, 30000);
                         }, 1000); // Wait 1 second after duel-started before sending question
                     }, 5000); // 5 second delay between rounds
                     return;
@@ -542,15 +567,23 @@ function processDuelResult(result: DuelResult) {
                     duelData.timeoutId = undefined;
                 }
                 
+                // Set continueToNextRound to false if defender won
+                if (result.winner === 'defender') {
+                    result.continueToNextRound = false;
+                }
+                
                 // Emit result before cleaning up
                 result.shieldsRemaining = territory.shields || 0;
                 io.emit('duel-result', result);
                 
-                // Clean up active questions for BOTH players
+                // Clean up active questions for all participants
                 activeQuestions.delete(result.attackerId);
                 if (result.defenderId) {
                     activeQuestions.delete(result.defenderId);
                 }
+                duelData.observers.forEach(observerId => {
+                    activeQuestions.delete(observerId);
+                });
 
                 // If attacker won all rounds, update territory ownership
                 if (result.winner === 'attacker' && duelData.round === duelData.roundsRequired) {
@@ -1705,9 +1738,32 @@ io.on('connection', (socket) => {
             duel.observerAnswers.set(playerId, isCorrect);
         }
         
-        // Check if all required players have answered
-        if ((duel.attackerId && duel.defenderId && duel.answers.size === 2) || 
-            (!duel.defenderId && duel.answers.has(duel.attackerId))) {
+        // Check if all participants have answered
+        const allParticipantsAnswered = () => {
+            // Check if attacker has answered
+            const attackerAnswered = duel.answers.has(duel.attackerId);
+            
+            // For unclaimed territories, we only need attacker and observers
+            if (!duel.defenderId) {
+                return attackerAnswered && 
+                       duel.observers.size === duel.observerAnswers.size;
+            }
+            
+            // For claimed territories, we need both attacker, defender, and all observers
+            const defenderAnswered = duel.answers.has(duel.defenderId);
+            return attackerAnswered && 
+                   defenderAnswered && 
+                   duel.observers.size === duel.observerAnswers.size;
+        };
+
+        console.log(`Answer status:
+            Attacker (${duel.attackerId}): ${duel.answers.has(duel.attackerId)}
+            Defender (${duel.defenderId || 'none'}): ${duel.defenderId ? duel.answers.has(duel.defenderId) : 'N/A'}
+            Observers answered: ${duel.observerAnswers.size}/${duel.observers.size}
+        `);
+        
+        if (allParticipantsAnswered()) {
+            console.log('✅ All participants have answered, processing results...');
             
             // Clear the timeout so it doesn't process twice
             if (duel.timeoutId) {
@@ -1715,8 +1771,10 @@ io.on('connection', (socket) => {
                 duel.timeoutId = undefined;
             }
             
-            // Process results immediately
+            // Process results
             processDuelResults(duel);
+        } else {
+            console.log('⏳ Waiting for other participants to answer...');
         }
     });
 
