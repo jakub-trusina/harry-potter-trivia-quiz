@@ -323,14 +323,27 @@ input[type="text"] {
 }
 
 #question-container {
-    margin-top: 20px;
-    text-align: left;
+    margin-bottom: 20px;
+    width: 100%;
+    background-color: rgba(0, 0, 0, 0.3);
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(211, 166, 37, 0.3);
+    display: block !important;
+    visibility: visible !important;
 }
 
 #question-text {
+    color: #FFFFFF;
     font-size: 1.2rem;
-    margin-bottom: 20px;
-    line-height: 1.5;
+    margin-bottom: 1.5rem;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 1rem;
+    border-radius: 5px;
+    border: 1px solid var(--gryffindor-gold);
+    min-height: 3rem;
+    display: block !important;
+    visibility: visible !important;
 }
 
 #answers-container {
@@ -946,4 +959,19 @@ input[type="text"] {
 .close-help {
     display: block;
     margin: 20px auto 0;
+}
+
+.duel-question {
+    color: #FFFFFF !important;
+    font-size: 1.3rem !important;
+    font-weight: bold !important;
+    margin: 1rem 0 1.5rem 0 !important;
+    padding: 1rem !important;
+    background-color: rgba(0, 0, 0, 0.5) !important;
+    border: 2px solid var(--gryffindor-gold) !important;
+    border-radius: 5px !important;
+    box-shadow: 0 0 10px rgba(211, 166, 37, 0.5) !important;
+    text-align: center !important;
+    display: block !important;
+    visibility: visible !important;
 } 

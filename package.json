@@ -9,7 +9,7 @@
     "build": "npm run build:server && npm run build:client && npm run copy-static",
     "build:server": "tsc -p tsconfig.server.json",
     "build:client": "tsc -p tsconfig.client.json",
-    "dev": "NODE_OPTIONS='--experimental-specifier-resolution=node' ts-node-dev --respawn src/server.ts",
+    "dev": "ts-node --esm src/server.ts",
     "copy-static": "mkdir -p dist/public && cp -r src/public/* dist/public/ && mkdir -p dist/public/js/types && mkdir -p dist/public/js/utils && cp -r src/types dist/public/js/ && cp -r src/utils dist/public/js/",
     "test": "jest",
     "clean": "rimraf dist",

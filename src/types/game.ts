@@ -44,7 +44,6 @@ export interface DuelResult {
     winner?: 'attacker' | 'defender' | null;
     attackerCorrect?: boolean;
     defenderCorrect?: boolean;
-    answerText: string;
     observerResults: ObserverResult[];
 }
 

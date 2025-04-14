@@ -1,8 +1,25 @@
 // Types for Socket.IO client
 declare const io: any;
 
-import { Territory, Player, Question, DuelResult, GameState } from './types/game.js';
-import { getHouseFromName, moveModalsToBody } from './utils/helpers.js';
+import { Territory, Player, Question, GameState } from './types/game.js';
+import { getHouseFromName, moveModalsToBody, debugDuel } from './utils/helpers.js';
+
+// Add this interface at the top of the file where other interfaces are defined
+
+interface DuelResult {
+    type: string;
+    attackerCorrect: boolean;
+    defenderCorrect?: boolean;
+    attackerId: string;
+    defenderId?: string;
+    territoryId: string;
+    correctAnswer?: string;
+    observerResults?: any[];
+    winner?: string | null;
+    isCapitolRound?: boolean;
+    roundNumber?: number;
+    roundsRequired?: number;
+}
 
 // Wait for the DOM to be fully loaded before initializing
 document.addEventListener('DOMContentLoaded', () => {
@@ -117,6 +134,21 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
         console.log('🔌 Initializing Socket.IO connection...');
         socket = io();
+        
+        // Add socket event debugging
+        const originalEmit = socket.emit;
+        socket.emit = function(event: string, ...args: any[]) {
+            console.log(`📤 SOCKET EMIT: ${event}`, args);
+            return originalEmit.apply(this, [event, ...args]);
+        };
+        
+        // Add a listener for all events
+        const onevent = socket.onevent;
+        socket.onevent = function(packet: any) {
+            const args = packet.data || [];
+            console.log(`📥 SOCKET RECEIVED: ${args[0]}`, args.slice(1));
+            onevent.call(this, packet);
+        };
         
         socket.on('connect', () => {
             playerId = socket.id || null;
@@ -486,6 +518,20 @@ document.addEventListener('DOMContentLoaded', () => {
         addLogEntry(errorMessage);
     });
 
+    // Handle duel-started event
+    socket.on('duel-started', (data: { role: string }) => {
+        console.log('🎭 Duel started, your role:', data.role);
+        debugDuel(`Duel started as ${data.role}`);
+        addLogEntry(`You've entered a magical duel as the ${data.role.toUpperCase()}`);
+    });
+
+    // Add debug logs for question event
+    socket.on('question', (data: { question: string; answers: string[]; role: string }) => {
+        debugDuel(`Received question event with role ${data.role}`);
+        console.log('📝 Question data:', data);
+        showQuestionDialog(data.question, data.answers, data.role);
+    });
+
     // Add function to update turn indicator
     function updateTurnIndicator(): void {
         const turnIndicator = document.getElementById('turn-indicator');
@@ -569,18 +615,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function cleanupModalState() {
+        console.log('🧹 Cleaning up modal state');
+        
         const modal = document.getElementById('quiz-modal');
         const duelResult = document.getElementById('duel-result');
         const observerResponses = document.getElementById('observer-responses');
         const observerAnswers = document.getElementById('observer-answers-container');
+        const questionContainer = document.getElementById('question-container');
         
         if (!modal || !duelResult || !observerResponses || !observerAnswers) {
-            console.error('❌ Required modal elements not found');
+            console.error('❌ Required modal elements not found for cleanup');
             return;
         }
 
         // Clear any existing timer
         if (currentModalState.timer) {
+            console.log('⏱️ Clearing timer');
             clearInterval(currentModalState.timer);
             currentModalState.timer = null;
         }
@@ -589,8 +639,11 @@ document.addEventListener('DOMContentLoaded', () => {
         currentModalState.isOpen = false;
         currentModalState.questionId = null;
 
-        // Hide all modal sections
+        // Hide the entire modal
+        console.log('🙈 Hiding modal');
         modal.classList.add('hidden');
+        
+        // Hide specific sections but don't touch the question container
         duelResult.classList.add('hidden');
         observerResponses.classList.add('hidden');
         
@@ -628,10 +681,25 @@ document.addEventListener('DOMContentLoaded', () => {
             // Show who won and the correct answer
             let resultHTML = `
                 <div class="result">
-                    <div class="correct-answer">Correct answer: ${result.answerText}</div>
-                    <div class="player-result ${result.attackerCorrect ? 'correct' : 'incorrect'}">
-                        ${attacker.name}: ${result.attackerCorrect ? 'Correct' : 'Incorrect'}
+                    <div class="correct-answer">Correct answer: ${result.correctAnswer || 'N/A'}</div>
+            `;
+            
+            // For capitol territories, show round information
+            if (result.isCapitolRound) {
+                resultHTML += `
+                    <div class="capitol-round-info">
+                        Round ${result.roundNumber || 1} of 2 completed.
+                        ${result.winner === 'attacker' ? 'Attacker won this round!' : 'Defender protected the territory this round!'}
+                        ${(result.roundNumber || 1) < 2 ? 'Next round starting soon...' : ''}
                     </div>
+                `;
+            }
+
+            // Always show attacker's result first
+            resultHTML += `
+                <div class="player-result ${result.attackerCorrect ? 'correct' : 'incorrect'}">
+                    ${attacker.name}: ${result.attackerCorrect ? 'Correct' : 'Incorrect'}
+                </div>
             `;
 
             if (result.defenderCorrect !== undefined && defender) {
@@ -786,9 +854,6 @@ document.addEventListener('DOMContentLoaded', () => {
             (btn as HTMLButtonElement).disabled = false;
         });
         
-        // Remove any existing question dialogs
-        document.querySelectorAll('.question-dialog').forEach(dialog => dialog.remove());
-        
         // Clear any existing result content
         if (duelResult) {
             duelResult.innerHTML = '';
@@ -804,30 +869,60 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function showQuestionDialog(question: string, answers: string[], role: string) {
+        debugDuel(`Attempting to show question dialog`);
+        console.log('🧙 Showing question dialog with:', { question, answers, role });
+        
+        // Get all required elements
         const modal = document.getElementById('quiz-modal');
         const questionText = document.getElementById('question-text');
         const answersContainer = document.getElementById('answers-container');
         const timer = document.getElementById('timer');
         const duelStatus = document.getElementById('duel-status');
+        const questionContainer = document.getElementById('question-container');
+        const duelResult = document.getElementById('duel-result');
         
-        if (!modal || !questionText || !answersContainer || !timer || !duelStatus) {
-            console.error('❌ Required modal elements not found');
+        if (!modal || !questionText || !answersContainer || !timer || !duelStatus || !questionContainer || !duelResult) {
+            debugDuel('❌ Failed to find required modal elements');
+            console.error('❌ Required modal elements not found', {
+                modal: !!modal,
+                questionText: !!questionText,
+                answersContainer: !!answersContainer,
+                timer: !!timer,
+                duelStatus: !!duelStatus,
+                questionContainer: !!questionContainer,
+                duelResult: !!duelResult
+            });
             return;
         }
 
-        // Clean up any existing modal state
-        cleanupModalState();
-
-        // Set new modal state
+        debugDuel('Found all required modal elements');
+        // First, forcefully cleanup any existing state
+        if (currentModalState.timer) {
+            clearInterval(currentModalState.timer);
+            currentModalState.timer = null;
+        }
+        
+        // Make sure all previous results are hidden
+        duelResult.classList.add('hidden');
+        
+        // Reset the modal state
         currentModalState.isOpen = true;
         currentModalState.questionId = Date.now().toString();
 
-        // Show modal and set role-specific styling
+        // Show modal and ensure question container is visible
         modal.classList.remove('hidden');
+        questionContainer.classList.remove('hidden');
+        questionContainer.style.display = 'block';
+        
+        // Set role indicator
         duelStatus.innerHTML = `<div class="duel-player ${role}">${role.toUpperCase()}</div>`;
         
-        // Set question text
+        // Ensure question text is visible and set
         questionText.textContent = question;
+        questionText.style.display = 'block';
+        questionText.style.visibility = 'visible';
+        
+        console.log('💬 Setting question text to:', question);
 
         // Start timer
         let timeLeft = 20;
@@ -845,6 +940,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Create answer buttons
         answersContainer.innerHTML = '';
+        console.log('🔘 Creating answer buttons for:', answers);
+        
         answers.forEach((answer, index) => {
             const button = document.createElement('button');
             button.className = 'answer-btn';
@@ -852,9 +949,21 @@ document.addEventListener('DOMContentLoaded', () => {
             button.addEventListener('click', () => {
                 clearInterval(timerInterval);
                 socket.emit('submit-answer', answer);
-                cleanupModalState();
+                // Don't hide the modal - let it stay open until results arrive
+                
+                // Disable all buttons after selection
+                document.querySelectorAll('.answer-btn').forEach(btn => {
+                    (btn as HTMLButtonElement).disabled = true;
+                });
+                
+                // Show "waiting for other players" message
+                const waitingMsg = document.createElement('div');
+                waitingMsg.className = 'waiting-message';
+                waitingMsg.textContent = 'Waiting for other players...';
+                answersContainer.appendChild(waitingMsg);
             });
             answersContainer.appendChild(button);
+            console.log(`Added button ${index}: ${answer}`);
         });
     }
-}); 
+});

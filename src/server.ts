@@ -4,7 +4,7 @@ import { Server } from 'socket.io';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { GameState, Player } from './types/game';
+import { GameState, Player } from './types/game.js';
 import { readFileSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -27,8 +27,19 @@ app.get('*', (_req, res) => {
 });
 
 // Game state
+interface Territory {
+    id: string;
+    owner: string;
+    isCapitol: boolean;
+    hasSupplyLine: boolean;
+    value: number;
+    x: number;
+    y: number;
+    shields?: number;
+}
+
 const gameState: GameState = {
-    territories: {},
+    territories: {} as Record<string, Territory>,
     players: [],
     currentTurn: null,
     gameActive: false
@@ -38,6 +49,21 @@ const gameState: GameState = {
 const questions: Question[] = JSON.parse(
     readFileSync(path.join(projectRoot, 'src', 'data', 'questions.json'), 'utf-8')
 );
+
+// Log basic info about questions loaded
+console.log(`Loaded ${questions.length} questions from JSON file`);
+// Normalize question data to use text property consistently
+questions.forEach(q => {
+    if (q.question && !q.text) {
+        q.text = q.question;
+    }
+});
+// Check for any remaining issues
+const questionsWithoutText = questions.filter(q => !q.text);
+if (questionsWithoutText.length > 0) {
+    console.warn(`⚠️ WARNING: ${questionsWithoutText.length} questions have missing 'text' property after normalization`);
+    console.warn(`Example of first problematic question:`, questionsWithoutText[0]);
+}
 
 interface PlayerState {
     id: string;
@@ -49,8 +75,9 @@ interface PlayerState {
 
 interface Question {
     id: string;
-    text: string;
-    correctAnswer: string;
+    text?: string;
+    question?: string;
+    correctAnswer: string | number;
     difficulty: "easy" | "medium" | "hard";
     answers: string[];
 }
@@ -85,7 +112,6 @@ interface DuelResult {
     attackerId: string;
     defenderId?: string;
     territoryId: string;
-    answerText?: string;
     correctAnswer?: string;
     observerResults?: ObserverResult[];
     winner?: string | null;  // Updated to allow null
@@ -112,10 +138,34 @@ function getRandomQuestion(territoryValue: number): Question {
     // If no questions found for the difficulty, fall back to any question
     if (filteredQuestions.length === 0) {
         console.warn(`No questions found for difficulty ${difficulty}, falling back to any question`);
-        return questions[Math.floor(Math.random() * questions.length)];
     }
     
-    return filteredQuestions[Math.floor(Math.random() * filteredQuestions.length)];
+    // Get a random question
+    const randomQuestions = filteredQuestions.length > 0 ? filteredQuestions : questions;
+    const question = randomQuestions[Math.floor(Math.random() * randomQuestions.length)];
+    
+    // Add fallback text if missing
+    if (!question.text) {
+        console.warn(`Question ${question.id} is missing text property, using fallback`);
+        
+        // Add default text based on the answers available
+        if (question.answers && question.answers.length > 0) {
+            if (question.correctAnswer !== undefined) {
+                const correctAnswerIndex = typeof question.correctAnswer === 'number' 
+                    ? question.correctAnswer 
+                    : question.answers.indexOf(question.correctAnswer);
+                    
+                const correctAnswer = question.answers[correctAnswerIndex] || "Unknown";
+                question.text = `Which of these is correct? The answer is ${correctAnswer}`;
+            } else {
+                question.text = `Select the correct answer from the options below`;
+            }
+        } else {
+            question.text = `Question ${question.id}`;
+        }
+    }
+    
+    return question;
 }
 
 // Helper function to check if a territory is connected to a capitol
@@ -128,7 +178,7 @@ function checkSupplyLine(territoryId: string, playerId: string): boolean {
     
     // Find the player's capitol
     const capitol = Object.values(gameState.territories)
-        .find(t => t.owner === playerId && t.isCapitol);
+        .find(t => t.owner === playerId && t.isCapitol) as Territory | undefined;
     
     if (!capitol) return false;
     
@@ -170,12 +220,11 @@ function updateSupplyLines(playerId: string): Promise<void> {
 
         // Find all territories owned by the player
         const ownedTerritories = Object.values(gameState.territories)
-            .filter(t => t.owner === playerId)
-            .map(t => t.id);
+            .filter(t => t.owner === playerId) as Territory[];
 
         // First, find all territories that have a path to capitol
         const territoriesWithSupplyLine = new Set<string>();
-        for (const territoryId of ownedTerritories) {
+        for (const territoryId of ownedTerritories.map(t => t.id)) {
             if (checkSupplyLine(territoryId, playerId)) {
                 territoriesWithSupplyLine.add(territoryId);
                 // Update territory's hasSupplyLine property
@@ -198,24 +247,16 @@ function updateSupplyLines(playerId: string): Promise<void> {
                 const dx = Math.abs(tx - ax);
                 const dy = Math.abs(ty - ay);
                 
-                // If territories are adjacent
+                // If they're adjacent, add a supply line
                 if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
-                    // Check if there's already a supply line between these territories
-                    const existingLine = player.supplyLines.find(line => 
-                        (line.from === territoryId && line.to === adjacentId) ||
-                        (line.from === adjacentId && line.to === territoryId)
-                    );
-                    
-                    if (!existingLine) {
-                        player.supplyLines.push({
-                            from: territoryId,
-                            to: adjacentId
-                        });
-                    }
+                    player.supplyLines.push({
+                        from: territoryId,
+                        to: adjacentId
+                    });
                 }
             }
         }
-        
+
         resolve();
     });
 }
@@ -527,7 +568,7 @@ function debugCapitols(): void {
     
     // Find all capitols
     const capitols = Object.values(gameState.territories)
-        .filter(t => t.isCapitol)
+        .filter((t): t is Territory => t.isCapitol)
         .map(t => ({ 
             id: t.id, 
             owner: t.owner, 
@@ -536,10 +577,10 @@ function debugCapitols(): void {
     
     console.log("🏰 Capitol territories:", capitols);
     
-    // Debug player ownership
+    // Check territory connections for each player
     gameState.players.forEach(player => {
         const ownedTerritories = Object.values(gameState.territories)
-            .filter(t => t.owner === player.id);
+            .filter(t => t.owner === player.id) as Territory[];
         
         const capitol = ownedTerritories.find(t => t.isCapitol);
         
@@ -562,8 +603,14 @@ function debugCapitols(): void {
                     console.log(`      Distance: dx=${Math.abs(tx-cx)}, dy=${Math.abs(ty-cy)}`);
                     
                     // Check if adjacent to capitol directly
-                    const isAdjacentToCapitol = Math.abs(tx-cx) + Math.abs(ty-cy) === 1;
-                    console.log(`      Adjacent to capitol: ${isAdjacentToCapitol}`);
+                    const isAdjacent = (Math.abs(tx-cx) === 1 && Math.abs(ty-cy) === 0) || 
+                                     (Math.abs(tx-cx) === 0 && Math.abs(ty-cy) === 1);
+                    
+                    if (isAdjacent) {
+                        console.log(`      ✅ Territory is adjacent to capitol, should have direct connection`);
+                    } else {
+                        console.log(`      ❌ Territory is not adjacent to capitol, requires path through connected territories`);
+                    }
                 }
             }
         });
@@ -734,7 +781,7 @@ function fixAllSupplyConnections(): void {
         
         // Get all territories owned by this player
         const ownedTerritories = Object.values(gameState.territories)
-            .filter(t => t.owner === player.id);
+            .filter((t): t is Territory => t.owner === player.id);
         
         // Find the player's capitol
         const capitol = ownedTerritories.find(t => t.isCapitol);
@@ -820,6 +867,7 @@ function nextTurn() {
 }
 
 function findPlayerDuel(playerId: string): DuelData | undefined {
+    // First check in activeDuels
     for (const [_, duel] of activeDuels) {
         if (duel.attackerId === playerId || 
             duel.defenderId === playerId || 
@@ -827,6 +875,20 @@ function findPlayerDuel(playerId: string): DuelData | undefined {
             return duel;
         }
     }
+    
+    // If not found, check in activeQuestions
+    console.log(`Looking for duel with player ${playerId} in activeQuestions`);
+    for (const [attackerId, duel] of activeQuestions) {
+        console.log(`Checking duel: attackerId=${attackerId}, defenderId=${duel.defenderId}`);
+        if (duel.attackerId === playerId || 
+            duel.defenderId === playerId || 
+            duel.observers.has(playerId)) {
+            console.log(`Found duel in activeQuestions for player ${playerId}`);
+            return duel;
+        }
+    }
+    
+    console.log(`No duel found for player ${playerId} in either activeDuels or activeQuestions`);
     return undefined;
 }
 
@@ -858,6 +920,10 @@ function processDuelResults(duel: DuelData): void {
     const attackerAnswer = duel.answers.get(duel.attackerId) ?? false;
     const defenderAnswer = duel.answers.get(duel.defenderId) ?? false;
     
+    const correctAnswerString = typeof duel.currentQuestion.correctAnswer === 'number' 
+        ? duel.currentQuestion.answers[duel.currentQuestion.correctAnswer] 
+        : String(duel.currentQuestion.correctAnswer);
+    
     const result: DuelResult = {
         type: 'claimed',
         attackerCorrect: attackerAnswer,
@@ -865,11 +931,10 @@ function processDuelResults(duel: DuelData): void {
         attackerId: duel.attackerId,
         defenderId: duel.defenderId,
         territoryId: duel.territory,
-        answerText: duel.currentQuestion.text,
-        correctAnswer: duel.currentQuestion.correctAnswer,
+        correctAnswer: correctAnswerString,
         observerResults: Array.from(duel.observerAnswers.entries()).map(([observerId, answer]) => ({
             playerId: observerId,
-            answer: answer ? duel.currentQuestion!.correctAnswer : '',
+            answer: answer ? correctAnswerString : '',
             correct: answer,
             scoreGained: answer ? 10 : 0
         }))
@@ -1001,10 +1066,19 @@ io.on('connection', (socket) => {
             // Get a random question
             const question = getRandomQuestion(territory.value);
             duelData.currentQuestion = question;
+            
+            // For debugging
+            console.log("Question to be emitted:", {
+                id: question.id,
+                text: question.text,
+                correctAnswer: question.correctAnswer,
+                difficulty: question.difficulty,
+                answersCount: question.answers.length
+            });
 
-            // Emit question to attacker
+            // Emit question to attacker with fixed structure
             socket.emit('question', { 
-                question: question.text,
+                question: question.text, // Ensure this is included
                 answers: question.answers,
                 role: 'attacker'
             });
@@ -1012,7 +1086,7 @@ io.on('connection', (socket) => {
             // Emit question to defender if exists
             if (territory.owner) {
                 io.to(territory.owner).emit('question', { 
-                    question: question.text,
+                    question: question.text, // Ensure this is included
                     answers: question.answers,
                     role: 'defender'
                 });
@@ -1021,7 +1095,7 @@ io.on('connection', (socket) => {
             // Emit question to observers
             observers.forEach(observerId => {
                 io.to(observerId).emit('question', {
-                    question: question.text,
+                    question: question.text, // Ensure this is included
                     answers: question.answers,
                     role: 'observer'
                 });
@@ -1030,7 +1104,11 @@ io.on('connection', (socket) => {
             // Set timeout for answer submission
             duelData.timeoutId = setTimeout(() => {
                 const duelData = activeQuestions.get(socket.id);
-                if (duelData) {
+                if (duelData && duelData.currentQuestion) {
+                    const correctAnswerString = typeof duelData.currentQuestion.correctAnswer === 'number' 
+                        ? duelData.currentQuestion.answers[duelData.currentQuestion.correctAnswer] 
+                        : String(duelData.currentQuestion.correctAnswer);
+                        
                     const result: DuelResult = {
                         type: 'claimed',
                         attackerCorrect: false,
@@ -1038,11 +1116,10 @@ io.on('connection', (socket) => {
                         attackerId: socket.id,
                         defenderId: duelData.defenderId,
                         territoryId: duelData.territory,
-                        answerText: question.text,
-                        correctAnswer: question.correctAnswer,
+                        correctAnswer: correctAnswerString,
                         observerResults: Array.from(duelData.observerAnswers.entries()).map(([observerId, answer]) => ({
                             playerId: observerId,
-                            answer: answer ? question.correctAnswer : '',
+                            answer: answer ? correctAnswerString : '',
                             correct: answer,
                             scoreGained: answer ? 10 : 0
                         }))
@@ -1054,19 +1131,87 @@ io.on('connection', (socket) => {
     });
 
     socket.on('submit-answer', (answer: string) => {
+        console.log(`===============================================`);
+        console.log(`🔴 SUBMIT-ANSWER CALLED: Player ${socket.id} submitted "${answer}"`);
+        
         const playerId = socket.id;
         const duel = findPlayerDuel(playerId);
         
         if (!duel) return;
         
+        // Add debug logging to see what's happening
+        console.log(`📊 ANSWER DEBUG - Player ${playerId} submitted: "${answer}"`);
+        console.log(`📊 Question data:`, {
+            questionId: duel.currentQuestion?.id,
+            correctAnswer: duel.currentQuestion?.correctAnswer,
+            correctAnswerType: typeof duel.currentQuestion?.correctAnswer,
+            answers: duel.currentQuestion?.answers,
+            playerSubmittedAnswer: answer
+        });
+        
+        // Helper function to normalize strings for comparison
+        const normalizeForComparison = (str: string) => {
+            return str.toLowerCase().trim();
+        };
+        
+        // Properly evaluate the answer based on the correctAnswer type
         if (playerId === duel.attackerId || playerId === duel.defenderId) {
-            duel.answers.set(playerId, answer === duel.currentQuestion?.correctAnswer);
+            // Handle numeric correctAnswer indexes correctly
+            let isCorrect = false;
+            
+            if (typeof duel.currentQuestion?.correctAnswer === 'number') {
+                // For numeric indices, find the index of the player's answer in the answers array
+                const answerIndex = duel.currentQuestion.answers.findIndex(a => 
+                    normalizeForComparison(a) === normalizeForComparison(answer));
+                
+                console.log(`📊 Index-based evaluation: Player answer "${answer}" is at index ${answerIndex}, correct index is ${duel.currentQuestion.correctAnswer}`);
+                isCorrect = answerIndex === duel.currentQuestion.correctAnswer;
+            } else {
+                // For string-based correctAnswer
+                const correctAnswerValue = duel.currentQuestion?.correctAnswer;
+                
+                // Normalize strings before comparison
+                const normalizedAnswer = normalizeForComparison(answer);
+                const normalizedCorrect = correctAnswerValue ? normalizeForComparison(correctAnswerValue as string) : '';
+                
+                console.log(`📊 String-based evaluation: "${normalizedAnswer}" === "${normalizedCorrect}"`);
+                isCorrect = normalizedAnswer === normalizedCorrect;
+            }
+            
+            console.log(`📊 Final evaluation result: ${isCorrect}`);
+            duel.answers.set(playerId, isCorrect);
         } else if (duel.observers.has(playerId)) {
-            duel.observerAnswers.set(playerId, answer === duel.currentQuestion?.correctAnswer);
+            // Similar logic for observers
+            let isCorrect = false;
+            
+            if (typeof duel.currentQuestion?.correctAnswer === 'number') {
+                const answerIndex = duel.currentQuestion.answers.findIndex(a => 
+                    normalizeForComparison(a) === normalizeForComparison(answer));
+                
+                isCorrect = answerIndex === duel.currentQuestion.correctAnswer;
+            } else {
+                const correctAnswerValue = duel.currentQuestion?.correctAnswer;
+                
+                const normalizedAnswer = normalizeForComparison(answer);
+                const normalizedCorrect = correctAnswerValue ? normalizeForComparison(correctAnswerValue as string) : '';
+                
+                isCorrect = normalizedAnswer === normalizedCorrect;
+            }
+            
+            duel.observerAnswers.set(playerId, isCorrect);
         }
         
-        // Check if all players have answered
-        if (duel.answers.size === 2) {
+        // Check if all required players have answered
+        if ((duel.attackerId && duel.defenderId && duel.answers.size === 2) || 
+            (!duel.defenderId && duel.answers.has(duel.attackerId))) {
+            
+            // Clear the timeout so it doesn't process twice
+            if (duel.timeoutId) {
+                clearTimeout(duel.timeoutId);
+                duel.timeoutId = undefined;
+            }
+            
+            // Process results immediately
             processDuelResults(duel);
         }
     });
@@ -1117,14 +1262,23 @@ io.on('connection', (socket) => {
         const question = getRandomQuestion(gameState.territories[territory].value);
         duelData.currentQuestion = question;
         
+        // For debugging
+        console.log("Question to be emitted in start-duel:", {
+            id: question.id,
+            text: question.text,
+            correctAnswer: question.correctAnswer,
+            difficulty: question.difficulty,
+            answersCount: question.answers.length
+        });
+        
         // Send question to both players
         io.to(attackerId).emit('question', { 
-            question: question.text,
+            question: question.text, // Ensure this is included
             answers: question.answers,
             role: 'attacker'
         });
         io.to(defenderId).emit('question', {
-            question: question.text,
+            question: question.text, // Ensure this is included
             answers: question.answers,
             role: 'defender'
         });
