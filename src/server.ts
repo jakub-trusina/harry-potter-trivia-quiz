@@ -96,6 +96,8 @@ interface DuelData {
     correctAnswer?: string;
     timeoutId?: NodeJS.Timeout;
     round?: number;
+    responseTime?: Map<string, number>;
+    questionSentTime?: number;
 }
 
 interface ObserverResult {
@@ -115,6 +117,8 @@ interface DuelResult {
     correctAnswer?: string;
     observerResults?: ObserverResult[];
     winner?: string | null;  // Updated to allow null
+    attackerResponseTime?: number;
+    defenderResponseTime?: number;
 }
 
 const activeQuestions = new Map<string, DuelData>();
@@ -301,6 +305,11 @@ function processDuelResult(result: DuelResult) {
                 result.winner = 'attacker';
             } else if (!attackerCorrect && defenderCorrect) {
                 result.winner = 'defender';
+            } else if (attackerCorrect && defenderCorrect) {
+                // Both correct - compare response times
+                const attackerTime = result.attackerResponseTime || Infinity;
+                const defenderTime = result.defenderResponseTime || Infinity;
+                result.winner = attackerTime <= defenderTime ? 'attacker' : 'defender';
             } else {
                 result.winner = null;
             }
@@ -919,6 +928,8 @@ function processDuelResults(duel: DuelData): void {
 
     const attackerAnswer = duel.answers.get(duel.attackerId) ?? false;
     const defenderAnswer = duel.answers.get(duel.defenderId) ?? false;
+    const attackerResponseTime = duel.responseTime?.get(duel.attackerId);
+    const defenderResponseTime = duel.responseTime?.get(duel.defenderId);
     
     const correctAnswerString = typeof duel.currentQuestion.correctAnswer === 'number' 
         ? duel.currentQuestion.answers[duel.currentQuestion.correctAnswer] 
@@ -932,10 +943,13 @@ function processDuelResults(duel: DuelData): void {
         defenderId: duel.defenderId,
         territoryId: duel.territory,
         correctAnswer: correctAnswerString,
+        attackerResponseTime,
+        defenderResponseTime,
         observerResults: Array.from(duel.observerAnswers.entries()).map(([observerId, answer]) => ({
             playerId: observerId,
             answer: answer ? correctAnswerString : '',
             correct: answer,
+            responseTime: duel.responseTime?.get(observerId),
             scoreGained: answer ? 10 : 0
         }))
     };
@@ -1132,22 +1146,24 @@ io.on('connection', (socket) => {
 
     socket.on('submit-answer', (answer: string) => {
         console.log(`===============================================`);
-        console.log(`🔴 SUBMIT-ANSWER CALLED: Player ${socket.id} submitted "${answer}"`);
+        console.log(`📝 Player ${socket.id} submitted answer:`, answer);
         
         const playerId = socket.id;
         const duel = findPlayerDuel(playerId);
         
-        if (!duel) return;
-        
-        // Add debug logging to see what's happening
-        console.log(`📊 ANSWER DEBUG - Player ${playerId} submitted: "${answer}"`);
-        console.log(`📊 Question data:`, {
-            questionId: duel.currentQuestion?.id,
-            correctAnswer: duel.currentQuestion?.correctAnswer,
-            correctAnswerType: typeof duel.currentQuestion?.correctAnswer,
-            answers: duel.currentQuestion?.answers,
-            playerSubmittedAnswer: answer
-        });
+        if (!duel || !duel.currentQuestion) {
+            console.error('❌ No active duel found for player', playerId);
+            return;
+        }
+
+        // Initialize response time map if it doesn't exist
+        if (!duel.responseTime) {
+            duel.responseTime = new Map();
+        }
+
+        // Calculate response time (time since question was sent)
+        const responseTime = duel.questionSentTime ? (Date.now() - duel.questionSentTime) / 1000 : 0; // Convert to seconds
+        duel.responseTime.set(playerId, responseTime);
         
         // Helper function to normalize strings for comparison
         const normalizeForComparison = (str: string) => {
@@ -1158,7 +1174,6 @@ io.on('connection', (socket) => {
         if (playerId === duel.attackerId || playerId === duel.defenderId) {
             // Handle numeric correctAnswer indexes correctly
             let isCorrect = false;
-            
             if (typeof duel.currentQuestion?.correctAnswer === 'number') {
                 // For numeric indices, find the index of the player's answer in the answers array
                 const answerIndex = duel.currentQuestion.answers.findIndex(a => 
@@ -1167,10 +1182,8 @@ io.on('connection', (socket) => {
                 console.log(`📊 Index-based evaluation: Player answer "${answer}" is at index ${answerIndex}, correct index is ${duel.currentQuestion.correctAnswer}`);
                 isCorrect = answerIndex === duel.currentQuestion.correctAnswer;
             } else {
-                // For string-based correctAnswer
                 const correctAnswerValue = duel.currentQuestion?.correctAnswer;
                 
-                // Normalize strings before comparison
                 const normalizedAnswer = normalizeForComparison(answer);
                 const normalizedCorrect = correctAnswerValue ? normalizeForComparison(correctAnswerValue as string) : '';
                 

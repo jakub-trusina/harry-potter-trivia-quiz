@@ -592,16 +592,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 `;
             }
-            // Always show attacker's result first
+            // Show attacker and defender results with response times
             resultHTML += `
                 <div class="player-result ${result.attackerCorrect ? 'correct' : 'incorrect'}">
                     ${attacker.name}: ${result.attackerCorrect ? 'Correct' : 'Incorrect'}
+                    ${result.attackerResponseTime ? ` (${result.attackerResponseTime.toFixed(2)}s)` : ''}
                 </div>
             `;
             if (result.defenderCorrect !== undefined && defender) {
                 resultHTML += `
                     <div class="player-result ${result.defenderCorrect ? 'correct' : 'incorrect'}">
                         ${defender.name}: ${result.defenderCorrect ? 'Correct' : 'Incorrect'}
+                        ${result.defenderResponseTime ? ` (${result.defenderResponseTime.toFixed(2)}s)` : ''}
                     </div>
                 `;
             }
@@ -614,7 +616,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         resultHTML += `
                             <div class="observer-result ${observerResult.correct ? 'correct' : 'incorrect'}">
                                 ${observer.name}: ${observerResult.correct ? 'Correct' : 'Incorrect'}
-                                ${observerResult.scoreGained ? `(+${observerResult.scoreGained} points)` : ''}
+                                ${observerResult.responseTime ? ` (${observerResult.responseTime.toFixed(2)}s)` : ''}
+                                ${observerResult.scoreGained ? ` (+${observerResult.scoreGained} points)` : ''}
                             </div>
                         `;
                     }

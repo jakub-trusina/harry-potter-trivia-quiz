@@ -19,6 +19,8 @@ interface DuelResult {
     isCapitolRound?: boolean;
     roundNumber?: number;
     roundsRequired?: number;
+    attackerResponseTime?: number;
+    defenderResponseTime?: number;
 }
 
 // Wait for the DOM to be fully loaded before initializing
@@ -695,10 +697,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             }
 
-            // Always show attacker's result first
+            // Show attacker and defender results with response times
             resultHTML += `
                 <div class="player-result ${result.attackerCorrect ? 'correct' : 'incorrect'}">
                     ${attacker.name}: ${result.attackerCorrect ? 'Correct' : 'Incorrect'}
+                    ${result.attackerResponseTime ? ` (${result.attackerResponseTime.toFixed(2)}s)` : ''}
                 </div>
             `;
 
@@ -706,6 +709,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 resultHTML += `
                     <div class="player-result ${result.defenderCorrect ? 'correct' : 'incorrect'}">
                         ${defender.name}: ${result.defenderCorrect ? 'Correct' : 'Incorrect'}
+                        ${result.defenderResponseTime ? ` (${result.defenderResponseTime.toFixed(2)}s)` : ''}
                     </div>
                 `;
             }
@@ -719,7 +723,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         resultHTML += `
                             <div class="observer-result ${observerResult.correct ? 'correct' : 'incorrect'}">
                                 ${observer.name}: ${observerResult.correct ? 'Correct' : 'Incorrect'}
-                                ${observerResult.scoreGained ? `(+${observerResult.scoreGained} points)` : ''}
+                                ${observerResult.responseTime ? ` (${observerResult.responseTime.toFixed(2)}s)` : ''}
+                                ${observerResult.scoreGained ? ` (+${observerResult.scoreGained} points)` : ''}
                             </div>
                         `;
                     }

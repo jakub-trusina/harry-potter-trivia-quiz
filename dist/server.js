@@ -204,6 +204,12 @@ function processDuelResult(result) {
             else if (!attackerCorrect && defenderCorrect) {
                 result.winner = 'defender';
             }
+            else if (attackerCorrect && defenderCorrect) {
+                // Both correct - compare response times
+                const attackerTime = result.attackerResponseTime || Infinity;
+                const defenderTime = result.defenderResponseTime || Infinity;
+                result.winner = attackerTime <= defenderTime ? 'attacker' : 'defender';
+            }
             else {
                 result.winner = null;
             }
@@ -729,6 +735,8 @@ function processDuelResults(duel) {
         return;
     const attackerAnswer = duel.answers.get(duel.attackerId) ?? false;
     const defenderAnswer = duel.answers.get(duel.defenderId) ?? false;
+    const attackerResponseTime = duel.responseTime?.get(duel.attackerId);
+    const defenderResponseTime = duel.responseTime?.get(duel.defenderId);
     const correctAnswerString = typeof duel.currentQuestion.correctAnswer === 'number'
         ? duel.currentQuestion.answers[duel.currentQuestion.correctAnswer]
         : String(duel.currentQuestion.correctAnswer);
@@ -740,10 +748,13 @@ function processDuelResults(duel) {
         defenderId: duel.defenderId,
         territoryId: duel.territory,
         correctAnswer: correctAnswerString,
+        attackerResponseTime,
+        defenderResponseTime,
         observerResults: Array.from(duel.observerAnswers.entries()).map(([observerId, answer]) => ({
             playerId: observerId,
             answer: answer ? correctAnswerString : '',
             correct: answer,
+            responseTime: duel.responseTime?.get(observerId),
             scoreGained: answer ? 10 : 0
         }))
     };
@@ -912,20 +923,20 @@ io.on('connection', (socket) => {
     });
     socket.on('submit-answer', (answer) => {
         console.log(`===============================================`);
-        console.log(`🔴 SUBMIT-ANSWER CALLED: Player ${socket.id} submitted "${answer}"`);
+        console.log(`📝 Player ${socket.id} submitted answer:`, answer);
         const playerId = socket.id;
         const duel = findPlayerDuel(playerId);
-        if (!duel)
+        if (!duel || !duel.currentQuestion) {
+            console.error('❌ No active duel found for player', playerId);
             return;
-        // Add debug logging to see what's happening
-        console.log(`📊 ANSWER DEBUG - Player ${playerId} submitted: "${answer}"`);
-        console.log(`📊 Question data:`, {
-            questionId: duel.currentQuestion?.id,
-            correctAnswer: duel.currentQuestion?.correctAnswer,
-            correctAnswerType: typeof duel.currentQuestion?.correctAnswer,
-            answers: duel.currentQuestion?.answers,
-            playerSubmittedAnswer: answer
-        });
+        }
+        // Initialize response time map if it doesn't exist
+        if (!duel.responseTime) {
+            duel.responseTime = new Map();
+        }
+        // Calculate response time (time since question was sent)
+        const responseTime = duel.questionSentTime ? (Date.now() - duel.questionSentTime) / 1000 : 0; // Convert to seconds
+        duel.responseTime.set(playerId, responseTime);
         // Helper function to normalize strings for comparison
         const normalizeForComparison = (str) => {
             return str.toLowerCase().trim();
@@ -941,9 +952,7 @@ io.on('connection', (socket) => {
                 isCorrect = answerIndex === duel.currentQuestion.correctAnswer;
             }
             else {
-                // For string-based correctAnswer
                 const correctAnswerValue = duel.currentQuestion?.correctAnswer;
-                // Normalize strings before comparison
                 const normalizedAnswer = normalizeForComparison(answer);
                 const normalizedCorrect = correctAnswerValue ? normalizeForComparison(correctAnswerValue) : '';
                 console.log(`📊 String-based evaluation: "${normalizedAnswer}" === "${normalizedCorrect}"`);
