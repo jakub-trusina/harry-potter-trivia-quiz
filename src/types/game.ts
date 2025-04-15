@@ -25,10 +25,12 @@ export interface Player {
 }
 
 export interface Question {
-    question: string;
+    id: string;
+    text?: string;
+    question?: string;
+    correctAnswer: string | number;
+    difficulty: "easy" | "medium" | "hard";
     answers: string[];
-    correctAnswer: string;
-    difficulty: 'easy' | 'medium' | 'hard';
 }
 
 export interface ObserverResult {

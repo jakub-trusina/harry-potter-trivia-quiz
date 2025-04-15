@@ -1,3 +1,6 @@
+// Export types for testing
+export type { Territory, Question, DuelData, DuelResult, ObserverResult };
+
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -92,7 +95,7 @@ function initializeQuestionQueues() {
         Hard: ${questionQueues.hard.length} questions`);
 }
 
-function shuffleAnswers(question: Question): Question {
+export function shuffleAnswers(question: Question): Question {
     // Create a copy of the question to avoid modifying the original
     const shuffledQuestion = { ...question };
     
@@ -111,7 +114,7 @@ function shuffleAnswers(question: Question): Question {
     return shuffledQuestion;
 }
 
-function getNextQuestion(territoryValue: number): Question {
+export function getNextQuestion(territoryValue: number): Question {
     // Map territory value to difficulty
     const difficulty = territoryValue === 3 ? "hard" : 
                       territoryValue === 2 ? "medium" : "easy";
@@ -158,7 +161,7 @@ function getNextQuestion(territoryValue: number): Question {
     return shuffleAnswers(question);
 }
 
-function getRandomQuestion(territoryValue: number): Question {
+export function getRandomQuestion(territoryValue: number): Question {
     // Map territory value to difficulty
     const difficulty = territoryValue === 3 ? "hard" : 
                       territoryValue === 2 ? "medium" : "easy";
