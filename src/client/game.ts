@@ -3,7 +3,7 @@ declare const io: any;
 
 import { initializeSocketHandlers } from './modules/socket-handler.js';
 import { initializeUI } from './modules/ui-manager.js';
-import { initializeStateManager } from './modules/state-manager.js';
+import { initializeStateManager, GameStateManager } from './modules/state-manager.js';
 import { initializeDuelHandlers } from './modules/duel-manager.js';
 import { initializeGameEndHandler } from './modules/game-end-manager.js';
 import { initializeHelpModal } from './modules/help-modal-manager.js';

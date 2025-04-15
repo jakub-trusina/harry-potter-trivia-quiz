@@ -40,7 +40,11 @@ export function initializeButtonHandlers(state: GameStateManager): void {
     // Start Game button
     state.ui.startGameBtn.addEventListener('click', () => {
         console.log("📣 Emitting start-game event to server");
-        state.socket.emit('start-game');
+        if (state.socket) {
+            state.socket.emit('start-game');
+        } else {
+            console.error('❌ Socket not connected');
+        }
     });
 
     // Help Modal

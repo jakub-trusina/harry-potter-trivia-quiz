@@ -1,13 +1,8 @@
 import { GameStateManager } from './state-manager.js';
+import { GameEndData } from '../../types/game.js';
+import { Socket } from 'socket.io-client';
 
-interface GameEndData {
-    winner: string;
-    winnerName: string;
-    reason: string;
-    finalScores: Array<{ name: string; score: number }>;
-}
-
-export function initializeGameEndHandler(socket: any, state: any) {
+export function initializeGameEndHandler(socket: Socket, state: GameStateManager): void {
     socket.on('close-all-modals', () => {
         // Close all modals
         if (state.ui?.duelModal) {
@@ -26,33 +21,33 @@ export function initializeGameEndHandler(socket: any, state: any) {
         }
     });
 
-    socket.on('game-end', (data: any) => {
+    socket.on('game-end', (data: GameEndData) => {
         handleGameEnd(data, state);
     });
 }
 
-function handleGameEnd(data: any, state: any) {
+function handleGameEnd(data: GameEndData, state: GameStateManager): void {
     const gameEndModal = document.getElementById('game-over-modal');
     if (!gameEndModal) return;
 
     // Create the final scores table with spacing
     let tableContent = `
         <tr>
-            <th style="padding-right: ${data.columnSpacing?.player || 20}px">PLAYER</th>
-            <th style="padding-right: ${data.columnSpacing?.score || 15}px">SCORE</th>
-            <th style="padding-right: ${data.columnSpacing?.territories || 15}px">TERRITORIES</th>
-            <th style="padding-right: ${data.columnSpacing?.capitol || 15}px">CAPITOL</th>
+            <th style="padding-right: 20px">PLAYER</th>
+            <th style="padding-right: 15px">SCORE</th>
+            <th style="padding-right: 15px">TERRITORIES</th>
+            <th style="padding-right: 15px">CAPITOL</th>
         </tr>
     `;
 
-    data.finalScores.forEach((score: any) => {
+    data.scores.forEach(score => {
         const hasCapitol = score.hasCapitol ? '✅' : '❌';
         tableContent += `
             <tr>
-                <td style="padding-right: ${data.columnSpacing?.player || 20}px">${score.name}</td>
-                <td style="padding-right: ${data.columnSpacing?.score || 15}px">${score.score}</td>
-                <td style="padding-right: ${data.columnSpacing?.territories || 15}px">${score.territories}</td>
-                <td style="padding-right: ${data.columnSpacing?.capitol || 15}px">${hasCapitol}</td>
+                <td style="padding-right: 20px">${score.name}</td>
+                <td style="padding-right: 15px">${score.score}</td>
+                <td style="padding-right: 15px">${score.territories}</td>
+                <td style="padding-right: 15px">${hasCapitol}</td>
             </tr>
         `;
     });

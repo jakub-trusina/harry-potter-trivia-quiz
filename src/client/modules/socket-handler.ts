@@ -1,5 +1,5 @@
 import { Socket } from 'socket.io-client';
-import { GameState } from '../../types/game.js';
+import { GameState, Player } from '../../types/game.js';
 import { GameStateManager } from './state-manager.js';
 import { updateGameState, updatePlayerId } from './state-manager.js';
 import { updatePlayerList, updateStartButton, updatePlayerStats } from './ui-manager.js';
@@ -122,9 +122,47 @@ export function initializeSocketHandlers(socket: Socket, state: GameStateManager
     });
 
     // Game state events
+    socket.on('joined-game', (data: { playerId: string, isHost: boolean, isReconnection: boolean }) => {
+        console.log('🎮 Joined game:', data);
+        state.playerId = data.playerId;
+        // Store host status in state
+        const currentPlayer: Player = { 
+            id: data.playerId,
+            name: state.playerName || 'Unknown Player', // Provide default name if null
+            territories: [],
+            points: 0,
+            score: 0,
+            eliminated: false,
+            supplyLines: [],
+            isHost: data.isHost,
+            socketId: data.playerId
+        };
+        
+        // Update player list if empty or add new player
+        if (state.players.length === 0) {
+            state.players = [currentPlayer];
+        } else {
+            state.players.push(currentPlayer);
+        }
+        
+        console.log('Current game state:', {
+            playerId: state.playerId,
+            players: state.players,
+            isHost: currentPlayer.isHost
+        });
+        
+        updatePlayerList(state);
+        updateStartButton(state);
+    });
+
     socket.on('player-list-update', (players: any[]) => {
         console.log('📋 Received player list update:', players);
         state.players = players;
+        console.log('Updated game state:', {
+            playerId: state.playerId,
+            players: state.players,
+            currentPlayer: state.players.find(p => p.id === state.playerId)
+        });
         updatePlayerList(state);
         updateStartButton(state);
         
@@ -133,10 +171,21 @@ export function initializeSocketHandlers(socket: Socket, state: GameStateManager
         }
     });
 
-    socket.on('game-state-update', (newState: any) => {
+    socket.on('game-state-update', (newState: GameState) => {
         console.log('🔄 Received game state update:', newState);
-        updateGameState(state, newState);
+        state.players = newState.players;
+        state.gameActive = newState.gameActive;
+        updateGameState(state, newState.territories);
+        console.log('Game state after update:', {
+            playerId: state.playerId,
+            players: state.players,
+            currentPlayer: state.players.find(p => p.id === state.playerId),
+            gameActive: state.gameActive
+        });
         updatePlayerList(state);
-        updatePlayerStats(state);
+        updateStartButton(state);
+        if (state.gameActive) {
+            updatePlayerStats(state);
+        }
     });
 } 

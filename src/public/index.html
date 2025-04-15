@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hogwarts Territory Conquest</title>
+    <link rel="icon" type="image/png" href="/img/favicon.png">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
 </head>
@@ -41,14 +42,14 @@
 
         <div id="game-screen" class="screen hidden">
             <div class="game-board">
+                <div id="turn-indicator" class="turn-indicator"></div>
                 <div id="map-container"></div>
                 <div id="game-info">
                     <div class="player-stats-container">
                         <div class="stats-header">
-                            <h3>Player Stats</h3>
                             <button class="help-button" title="Game Guide">?</button>
                         </div>
-                        <div id="player-stats"></div>
+                        <div id="player-stats" class="player-stats-grid"></div>
                     </div>
                     <div id="action-log">
                         <h3>Action Log</h3>

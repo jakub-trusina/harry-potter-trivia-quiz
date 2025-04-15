@@ -21,6 +21,9 @@ export interface UIElements {
     // Modals
     quizModal: HTMLDivElement;
     gameOverModal: HTMLDivElement;
+    duelModal?: HTMLDivElement;
+    observerModal?: HTMLDivElement;
+    resultModal?: HTMLDivElement;
     
     // Quiz elements
     questionContainer: HTMLDivElement;

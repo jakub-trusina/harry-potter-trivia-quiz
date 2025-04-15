@@ -1,4 +1,4 @@
-import { GameState } from '../../types/game.js';
+import { GameState, Player } from '../../types/game.js';
 import { UIElements } from '../../types/ui.js';
 import { GameStateManager } from './state-manager.js';
 
@@ -35,7 +35,23 @@ export function initializeUI(state: GameStateManager): void {
         timer: document.getElementById('timer') as HTMLDivElement
     };
 
-    // Validate that all elements exist
+    // Add optional modal elements if they exist
+    const duelModal = document.getElementById('duel-modal');
+    if (duelModal) {
+        elements.duelModal = duelModal as HTMLDivElement;
+    }
+
+    const observerModal = document.getElementById('observer-modal');
+    if (observerModal) {
+        elements.observerModal = observerModal as HTMLDivElement;
+    }
+
+    const resultModal = document.getElementById('result-modal');
+    if (resultModal) {
+        elements.resultModal = resultModal as HTMLDivElement;
+    }
+
+    // Validate that all required elements exist
     for (const [key, element] of Object.entries(elements)) {
         if (!element || (Array.isArray(element) && element.length === 0)) {
             console.error(`Required UI element not found: ${key}`);
@@ -79,7 +95,23 @@ export function initializeUIElements(): UIElements | null {
         timer: document.getElementById('timer') as HTMLDivElement
     };
 
-    // Validate that all elements exist
+    // Add optional modal elements if they exist
+    const duelModal = document.getElementById('duel-modal');
+    if (duelModal) {
+        elements.duelModal = duelModal as HTMLDivElement;
+    }
+
+    const observerModal = document.getElementById('observer-modal');
+    if (observerModal) {
+        elements.observerModal = observerModal as HTMLDivElement;
+    }
+
+    const resultModal = document.getElementById('result-modal');
+    if (resultModal) {
+        elements.resultModal = resultModal as HTMLDivElement;
+    }
+
+    // Validate that all required elements exist
     for (const [key, element] of Object.entries(elements)) {
         if (!element) {
             console.error(`Failed to initialize UI element: ${key}`);
@@ -118,10 +150,20 @@ export function updatePlayerList(state: GameStateManager): void {
 
     state.players.forEach(player => {
         const li = document.createElement('li');
-        li.textContent = player.name;
+        const playerName = document.createElement('div');
+        playerName.className = 'player-name';
+        playerName.textContent = player.name + (player.isHost ? ' (Host)' : '');
+        li.appendChild(playerName);
+
+        const territories = document.createElement('div');
+        territories.className = 'territory-count';
+        territories.textContent = `${player.territories.length} territories`;
+        li.appendChild(territories);
+
         if (player.id === state.playerId) {
             li.classList.add('current-player');
         }
+        
         playerList.appendChild(li);
     });
 }
@@ -129,21 +171,88 @@ export function updatePlayerList(state: GameStateManager): void {
 export function updateStartButton(state: GameStateManager): void {
     if (!state.ui?.startGameBtn) return;
     
-    const canStart = state.players.length >= 2 && state.players.length <= 4;
+    // Get the current player
+    const currentPlayer = state.players.find(p => p.id === state.playerId);
+    
+    // Count non-disconnected players
+    const activePlayers = state.players.filter(p => !p.disconnected).length;
+    
+    // Enable the button only if:
+    // 1. Current player is the host
+    // 2. There are 2-4 active players
+    // 3. Game is not already active
+    const canStart = currentPlayer?.isHost === true && 
+                    activePlayers >= 2 && 
+                    activePlayers <= 4 && 
+                    !state.gameActive;
+    
+    console.log('Start button state:', {
+        currentPlayerId: state.playerId,
+        currentPlayer,
+        isHost: currentPlayer?.isHost,
+        activePlayers,
+        gameActive: state.gameActive,
+        canStart
+    });
+                    
     state.ui.startGameBtn.disabled = !canStart;
+    
+    // Update the waiting text
+    const waitingText = document.querySelector('.waiting-text');
+    if (waitingText) {
+        if (activePlayers < 2) {
+            waitingText.textContent = 'Waiting for more players (2-4 needed)';
+        } else if (activePlayers > 4) {
+            waitingText.textContent = 'Too many players (maximum 4)';
+        } else if (!currentPlayer?.isHost) {
+            waitingText.textContent = 'Waiting for host to start the game';
+        } else if (state.gameActive) {
+            waitingText.textContent = 'Game in progress';
+        } else {
+            waitingText.textContent = 'Ready to start!';
+        }
+    }
 }
 
 export function updatePlayerStats(state: GameStateManager): void {
     if (!state.ui?.playerStats) return;
 
     const playerStats = state.ui.playerStats;
-    const currentPlayer = state.players.find(p => p.id === state.playerId);
-    
-    if (currentPlayer) {
-        playerStats.innerHTML = `
-            <h3>Your Stats</h3>
-            <p>Territories: ${currentPlayer.territories.length}</p>
-            <p>Score: ${currentPlayer.score || 0}</p>
-        `;
+    const turnIndicator = document.getElementById('turn-indicator');
+
+    // Update turn indicator
+    if (turnIndicator) {
+        if (state.currentTurn === state.playerId) {
+            turnIndicator.textContent = 'Your Turn';
+            turnIndicator.classList.add('your-turn');
+        } else {
+            const currentPlayer = state.players.find(p => p.id === state.currentTurn);
+            turnIndicator.textContent = `${currentPlayer?.name || 'Unknown Player'}'s Turn`;
+            turnIndicator.classList.remove('your-turn');
+        }
     }
+
+    // Update player stats grid
+    playerStats.className = `player-stats-grid players-${state.players.length}`;
+    playerStats.innerHTML = '';
+
+    // Sort players so current player is first
+    const sortedPlayers = [...state.players].sort((a, b) => {
+        if (a.id === state.playerId) return -1;
+        if (b.id === state.playerId) return 1;
+        return 0;
+    });
+
+    sortedPlayers.forEach(player => {
+        const playerCard = document.createElement('div');
+        playerCard.className = `player-stat-card${player.id === state.playerId ? ' current-player' : ''}`;
+        
+        playerCard.innerHTML = `
+            <div class="player-name">${player.name}</div>
+            <div class="stat-row">Territories: ${player.territories.length}</div>
+            <div class="stat-row">Score: ${player.points || 0}</div>
+        `;
+        
+        playerStats.appendChild(playerCard);
+    });
 } 

@@ -1,41 +1,43 @@
 import { Socket } from 'socket.io-client';
 import { UIElements } from '../../types/ui.js';
-import { Territory, Player } from '../../types/game.js';
-
-export interface ModalState {
-    isOpen: boolean;
-    questionId: string | null;
-    timer: NodeJS.Timeout | null;
-}
+import { Territory, Player, CurrentDuel, DuelData } from '../../types/game.js';
+import { ModalState } from '../types.js';
 
 export interface GameStateManager {
-    socket: Socket;
+    socket: Socket | null;
     ui: UIElements | null;
-    playerId: string | null;
-    playerName: string;
-    players: Player[];
     territories: { [key: string]: Territory };
-    gameActive: boolean;
+    players: Player[];
+    playerId: string | null;
+    playerName: string | null;
     currentTurn: string | null;
-    currentModalState: ModalState;
+    gameActive: boolean;
+    currentModalState: ModalState | null;
+    currentDuel: CurrentDuel | null;
+    activeDuels: DuelData[];
+    updateModalState: (updates: Partial<ModalState>) => void;
+    updateCurrentDuel: (duel: CurrentDuel | null) => void;
+    cleanupModalState: () => void;
 }
 
 export function initializeStateManager(): GameStateManager {
-    return {
-        socket: null as any,
+    const state: GameStateManager = {
+        socket: null,
         ui: null,
-        playerId: null,
-        playerName: '',
-        players: [],
         territories: {},
-        gameActive: false,
+        players: [],
+        playerId: null,
+        playerName: null,
         currentTurn: null,
-        currentModalState: {
-            isOpen: false,
-            questionId: null,
-            timer: null
-        }
+        gameActive: false,
+        currentModalState: null,
+        currentDuel: null,
+        activeDuels: [],
+        updateModalState: (updates) => updateModalState(state, updates),
+        updateCurrentDuel: (duel) => updateCurrentDuel(state, duel),
+        cleanupModalState: () => cleanupState(state)
     };
+    return state;
 }
 
 export function updateState(state: GameStateManager, newState: Partial<GameStateManager>): void {
@@ -54,6 +56,30 @@ export function updatePlayerName(state: GameStateManager, name: string): void {
     state.playerName = name;
 }
 
-export function updateModalState(state: GameStateManager, updates: Partial<ModalState>): void {
-    state.currentModalState = { ...state.currentModalState, ...updates };
+export function updateModalState(state: GameStateManager, newState: Partial<ModalState>): void {
+    if (!state.currentModalState) {
+        state.currentModalState = {
+            isOpen: false,
+            questionId: null,
+            timer: null,
+            selectedAnswer: null,
+            cleanup: undefined
+        };
+    }
+    state.currentModalState = {
+        ...state.currentModalState,
+        ...newState
+    };
+}
+
+export function updateCurrentDuel(state: GameStateManager, duel: CurrentDuel | null): void {
+    state.currentDuel = duel;
+}
+
+export function cleanupState(state: GameStateManager): void {
+    if (state.currentModalState?.timer) {
+        clearInterval(state.currentModalState.timer);
+    }
+    state.currentModalState = null;
+    state.currentDuel = null;
 } 

@@ -3,14 +3,14 @@
   "version": "1.0.0",
   "description": "A Harry Potter themed territory conquest game",
   "type": "module",
-  "main": "dist/server.js",
+  "main": "dist/server/server.js",
   "scripts": {
-    "start": "node dist/server.js",
+    "start": "node dist/server/server.js",
     "build": "npm run build:client && npm run build:server && npm run copy-static",
     "build:client": "tsc -p tsconfig.client.json",
     "build:server": "tsc -p tsconfig.server.json",
-    "dev": "ts-node --esm src/server.ts",
-    "copy-static": "mkdir -p dist/public && cp -r src/public/* dist/public/ && mkdir -p dist/public/js/types && mkdir -p dist/public/js/utils && cp -r src/types dist/public/js/ && cp -r src/utils dist/public/js/",
+    "dev": "ts-node --esm src/server/server.ts",
+    "copy-static": "node scripts/copy-static.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:unit": "npm test tests/unit",
     "test:integration": "npm test tests/integration",
@@ -25,16 +25,16 @@
     "socket.io-client": "^4.7.2"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.4.2",
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.12",
-    "@types/node": "^20.11.16",
+    "@types/node": "^20.17.30",
     "jest": "^29.7.0",
     "rimraf": "^5.0.5",
+    "supertest": "^6.3.4",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.3.3",
-    "@testing-library/jest-dom": "^6.4.2",
-    "supertest": "^6.3.4"
+    "typescript": "^5.3.3"
   }
-} 
+}

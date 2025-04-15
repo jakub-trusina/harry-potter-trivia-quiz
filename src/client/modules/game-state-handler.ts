@@ -1,39 +1,14 @@
 import { GameStateManager } from './state-manager.js';
 import { UIElements } from '../../types/ui.js';
 import { addLogEntry } from './log-manager.js';
-import { Territory, Player } from '../../types/game.js';
+import { Territory, Player, GameStartData, GameEndData } from '../../types/game.js';
 import { createMap, updateMap } from './map-manager.js';
 import { updatePlayerStats } from './ui-manager.js';
-
-export interface GameStartData {
-    territories: { [key: string]: Territory };
-    players: Player[];
-    currentTurn: string;
-}
-
-interface GameEndData {
-    scores: {
-        name: string;
-        id: string;
-        score: number;
-        territories: number;
-        hasCapitol: boolean;
-    }[];
-    conquestWinner: {
-        name: string;
-        id: string;
-    } | null;
-    scoreWinner: {
-        name: string;
-        id: string;
-        score: number;
-    };
-}
 
 export function initializeGameStateHandlers(state: GameStateManager): void {
     if (!state.socket) return;
 
-    state.socket.on('game-start', (data: GameStartData) => initializeGameState(state, data));
+    state.socket.on('game-started', (data: GameStartData) => initializeGameState(state, data));
     state.socket.on('game-state-update', (data: GameStartData) => handleGameStateUpdate(state, data));
     state.socket.on('game-end', (data: GameEndData) => handleGameEnd(state, data));
 }

@@ -974,4 +974,77 @@ input[type="text"] {
     text-align: center !important;
     display: block !important;
     visibility: visible !important;
+}
+
+/* Player stats grid */
+.player-stats-grid {
+    display: grid;
+    gap: 15px;
+    padding: 10px;
+}
+
+/* Grid layout based on player count */
+.player-stats-grid.players-2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.player-stats-grid.players-3 {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, auto);
+}
+
+.player-stats-grid.players-4 {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, auto);
+}
+
+.player-stat-card {
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid var(--gryffindor-gold);
+    border-radius: 8px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.player-stat-card.current-player {
+    background: rgba(211, 166, 37, 0.1);
+    box-shadow: 0 0 10px rgba(211, 166, 37, 0.3);
+}
+
+.player-stat-card .player-name {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: var(--gryffindor-gold);
+}
+
+.player-stat-card .stat-row {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+}
+
+/* Turn indicator */
+.turn-indicator {
+    background: rgba(0, 0, 0, 0.8);
+    color: var(--text-primary);
+    padding: 10px 20px;
+    border-radius: 20px;
+    border: 2px solid var(--gryffindor-gold);
+    text-align: center;
+    font-size: 1.2em;
+    margin-bottom: 15px;
+    width: fit-content;
+    margin: 0 auto 15px auto;
+}
+
+.turn-indicator.your-turn {
+    background: rgba(211, 166, 37, 0.2);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(211, 166, 37, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(211, 166, 37, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(211, 166, 37, 0); }
 } 
