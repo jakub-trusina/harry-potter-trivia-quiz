@@ -122,6 +122,7 @@ export interface DuelQuestion {
     round: number;
     totalRounds: number;
     shieldsRemaining: number;
+    duelId?: string;
     questionData?: {
         id: string;
         question: string;

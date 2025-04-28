@@ -136,6 +136,7 @@ io.on('connection', (socket) => {
                     socket.emit('duel-started', { 
                         role: 'attacker', 
                         duelId: duel.id,
+                        question: duel.question,
                         isCapitolRound: isCapitolAttack,
                         round: 1,
                         totalRounds: roundsRequired,
@@ -144,6 +145,7 @@ io.on('connection', (socket) => {
                     io.to(defender.socketId).emit('duel-started', { 
                         role: 'defender', 
                         duelId: duel.id,
+                        question: duel.question,
                         isCapitolRound: isCapitolAttack,
                         round: 1,
                         totalRounds: roundsRequired,
@@ -155,6 +157,7 @@ io.on('connection', (socket) => {
                         question: duel.question.text,
                         answers: duel.question.answers,
                         role: 'attacker',
+                        duelId: duel.id,
                         isCapitolRound: isCapitolAttack,
                         round: 1,
                         totalRounds: roundsRequired,
@@ -164,6 +167,7 @@ io.on('connection', (socket) => {
                         question: duel.question.text,
                         answers: duel.question.answers,
                         role: 'defender',
+                        duelId: duel.id,
                         isCapitolRound: isCapitolAttack,
                         round: 1,
                         totalRounds: roundsRequired,
@@ -184,16 +188,39 @@ io.on('connection', (socket) => {
     });
 
     // Handle duel answers - consolidated handler
-    socket.on('duel-answer', (data: { duelId: string, answer: string }) => {
+    socket.on('submit-answer', (data: { duelId: string, answer: string }) => {
         try {
+            console.log('📥 Received submit-answer:', data);
+            
             const state = gameStateManager.getState();
             const player = state.players.find(p => p.id === socket.id);
+            
+            // Debug active duels
+            console.log('🔍 Active duels:', state.activeDuels.map(d => ({ 
+                id: d.id, 
+                attacker: d.attacker,
+                defender: d.defender
+            })));
+            
             const duel = duelManager.getDuel(data.duelId);
+            
+            if (!duel) {
+                console.log('❌ Duel not found:', data.duelId);
+                socket.emit('error', 'Invalid duel answer - duel not found');
+                return;
+            }
+            
             const territory = state.territories[duel?.contestedTerritoryId || ''];
 
-            if (!player || !duel || !territory) {
-                console.log('❌ Invalid duel answer:', { playerId: socket.id, duelId: data.duelId });
-                socket.emit('error', 'Invalid duel answer');
+            if (!player) {
+                console.log('❌ Player not found:', socket.id);
+                socket.emit('error', 'Invalid duel answer - player not found');
+                return;
+            }
+            
+            if (!territory) {
+                console.log('❌ Territory not found:', duel?.contestedTerritoryId);
+                socket.emit('error', 'Invalid duel answer - territory not found');
                 return;
             }
 
@@ -253,6 +280,7 @@ io.on('connection', (socket) => {
                             question: newQuestion.text,
                             answers: newQuestion.answers,
                             role: 'attacker',
+                            duelId: duel.id,
                             isCapitolRound: result.isCapitolRound,
                             round: (result.round ?? 1) + 1,
                             totalRounds: result.totalRounds,
@@ -262,6 +290,7 @@ io.on('connection', (socket) => {
                             question: newQuestion.text,
                             answers: newQuestion.answers,
                             role: 'defender',
+                            duelId: duel.id,
                             isCapitolRound: result.isCapitolRound,
                             round: (result.round ?? 1) + 1,
                             totalRounds: result.totalRounds,

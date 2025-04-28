@@ -220,7 +220,7 @@ export function updatePlayerStats(state: GameStateManager): void {
     const playerStats = state.ui.playerStats;
     const turnIndicator = document.getElementById('turn-indicator');
 
-    // Update turn indicator
+    // Update turn indicator 
     if (turnIndicator) {
         if (state.currentTurn === state.playerId) {
             turnIndicator.textContent = 'Your Turn';
@@ -232,27 +232,71 @@ export function updatePlayerStats(state: GameStateManager): void {
         }
     }
 
-    // Update player stats grid
-    playerStats.className = `player-stats-grid players-${state.players.length}`;
-    playerStats.innerHTML = '';
+    // Check if we have players before updating
+    if (!state.players || state.players.length === 0) {
+        console.warn('No players data available for stats update');
+        return;
+    }
 
-    // Sort players so current player is first
+    // Enhanced debug logging to track player stats updates
+    console.log('🎮 Player stats update debug:', {
+        totalPlayers: state.players.length,
+        playerIds: state.players.map(p => p.id),
+        currentPlayerId: state.playerId,
+        turnPlayerId: state.currentTurn
+    });
+
+    // Fix for player stats not showing all players - ensure proper grid class
+    const numPlayers = state.players.length;
+    playerStats.innerHTML = ''; // Clear existing stats
+    playerStats.className = `player-stats-grid players-${numPlayers}`;
+    
+    console.log(`Updating player stats grid for ${numPlayers} players`);
+
+    // Ensure all players are displayed, with current player first
     const sortedPlayers = [...state.players].sort((a, b) => {
         if (a.id === state.playerId) return -1;
         if (b.id === state.playerId) return 1;
         return 0;
     });
 
+    // Create and append player cards to the grid
     sortedPlayers.forEach(player => {
+        // Skip eliminated players or those with missing data
+        if (!player || !player.id) {
+            console.warn('Skipping invalid player in stats update:', player);
+            return;
+        }
+        
         const playerCard = document.createElement('div');
         playerCard.className = `player-stat-card${player.id === state.playerId ? ' current-player' : ''}`;
         
+        // Count territories owned by this player
+        const territoryCount = Object.values(state.territories).filter(t => t.owner === player.id).length || 0;
+        
+        // Check if player has a capitol
+        const hasCapitol = Object.values(state.territories).some(t => 
+            t.owner === player.id && t.isCapitol
+        );
+        
+        // Create player card content
         playerCard.innerHTML = `
             <div class="player-name">${player.name}</div>
-            <div class="stat-row">Territories: ${player.territories.length}</div>
-            <div class="stat-row">Score: ${player.points || 0}</div>
+            <div class="stat-row">
+                <span>Territories:</span>
+                <span>${territoryCount}</span>
+            </div>
+            <div class="stat-row">
+                <span>Score:</span>
+                <span>${player.points || 0}</span>
+            </div>
+            <div class="stat-row">
+                <span>Capitol:</span>
+                <span>${hasCapitol ? '✅' : '❌'}</span>
+            </div>
         `;
         
         playerStats.appendChild(playerCard);
+        console.log(`Added player card for: ${player.name}`);
     });
 } 

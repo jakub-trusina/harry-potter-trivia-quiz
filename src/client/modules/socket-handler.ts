@@ -173,19 +173,43 @@ export function initializeSocketHandlers(socket: Socket, state: GameStateManager
 
     socket.on('game-state-update', (newState: GameState) => {
         console.log('🔄 Received game state update:', newState);
+        
+        // Add detailed player debugging
+        console.log('📊 Detailed player state: ', {
+            beforeUpdate: {
+                playerCount: state.players.length,
+                playerIds: state.players.map(p => p.id)
+            }
+        });
+        
         state.players = newState.players;
+        state.territories = newState.territories;
         state.gameActive = newState.gameActive;
-        updateGameState(state, newState.territories);
+        
+        // Make sure the current turn is updated
+        if (newState.currentTurn) {
+            state.currentTurn = newState.currentTurn;
+        }
+        
+        // Add detailed player debugging
+        console.log('📊 Detailed player state: ', {
+            afterUpdate: {
+                playerCount: state.players.length,
+                playerIds: state.players.map(p => p.id)
+            }
+        });
+        
         console.log('Game state after update:', {
             playerId: state.playerId,
             players: state.players,
             currentPlayer: state.players.find(p => p.id === state.playerId),
             gameActive: state.gameActive
         });
+        
         updatePlayerList(state);
         updateStartButton(state);
-        if (state.gameActive) {
-            updatePlayerStats(state);
-        }
+        
+        // Always update player stats when receiving a game state update
+        updatePlayerStats(state);
     });
 } 

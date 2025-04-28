@@ -198,12 +198,12 @@ input[type="text"] {
     margin-top: 20px;
 }
 
-/* Turn indicator - moved above game board */
+/* Turn indicator - correctly positioned above game board */
 .turn-indicator {
     position: relative;
     display: block;
     width: fit-content;
-    margin: 0 auto 15px auto;
+    margin: -20px auto 15px auto;
     background-color: rgba(0, 0, 0, 0.8);
     padding: 10px 20px;
     border-radius: 20px;
@@ -211,6 +211,21 @@ input[type="text"] {
     color: white;
     font-size: 1.2rem;
     text-align: center;
+    z-index: 10;
+}
+
+/* Turn indicator states */
+.turn-indicator.your-turn {
+    background: rgba(211, 166, 37, 0.2);
+    animation: pulse 2s infinite;
+}
+
+.turn-indicator.defeated {
+    color: #ff4444;
+    border-color: #ff4444;
+    background: rgba(0, 0, 0, 0.9);
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
 }
 
 /* Base territory styling */
@@ -692,21 +707,6 @@ input[type="text"] {
     width: 100%;
 }
 
-/* Turn indicator - positioned above game board */
-.turn-indicator {
-    position: relative;
-    display: block;
-    width: fit-content;
-    margin: 0 auto 15px auto;
-    background-color: rgba(0, 0, 0, 0.8);
-    padding: 10px 20px;
-    border-radius: 20px;
-    border: 2px solid var(--gryffindor-gold);
-    color: white;
-    font-size: 1.2rem;
-    text-align: center;
-}
-
 .game-end-message {
     position: fixed;
     top: 50%;
@@ -787,30 +787,6 @@ input[type="text"] {
     background: var(--gryffindor-red);
     color: var(--gryffindor-gold);
     transform: scale(1.05);
-}
-
-#turn-indicator {
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.8);
-    color: var(--gryffindor-gold);
-    padding: 10px 20px;
-    border-radius: 5px;
-    font-size: 1.2em;
-    z-index: 100;
-    border: 2px solid var(--gryffindor-gold);
-    text-align: center;
-    min-width: 200px;
-}
-
-#turn-indicator.defeated {
-    color: #ff4444;
-    border-color: #ff4444;
-    background: rgba(0, 0, 0, 0.9);
-    font-weight: bold;
-    text-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
 }
 
 .territory.capitol::before {
@@ -1024,25 +1000,7 @@ input[type="text"] {
     font-size: 0.9em;
 }
 
-/* Turn indicator */
-.turn-indicator {
-    background: rgba(0, 0, 0, 0.8);
-    color: var(--text-primary);
-    padding: 10px 20px;
-    border-radius: 20px;
-    border: 2px solid var(--gryffindor-gold);
-    text-align: center;
-    font-size: 1.2em;
-    margin-bottom: 15px;
-    width: fit-content;
-    margin: 0 auto 15px auto;
-}
-
-.turn-indicator.your-turn {
-    background: rgba(211, 166, 37, 0.2);
-    animation: pulse 2s infinite;
-}
-
+/* Keep only the pulse animation, remove the rest */
 @keyframes pulse {
     0% { box-shadow: 0 0 0 0 rgba(211, 166, 37, 0.4); }
     70% { box-shadow: 0 0 0 10px rgba(211, 166, 37, 0); }

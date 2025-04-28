@@ -3,6 +3,7 @@ import { DuelQuestion, DuelResult, CurrentDuel } from '../../types/game.js';
 import { DuelStartData } from '../../server/types.js';
 import { updateModalState, GameStateManager } from './state-manager.js';
 import { addLogEntry } from './log-manager.js';
+import { updatePlayerStats } from './ui-manager.js';
 
 export function initializeDuelHandlers(state: GameStateManager): void {
     if (!state.socket) return;
@@ -15,6 +16,8 @@ export function initializeDuelHandlers(state: GameStateManager): void {
             }
 
             console.log('🎭 Duel started, your role:', data.role, 'Capitol round:', data.isCapitolRound);
+            console.log('DEBUG - Duel started data:', data);
+            console.log('DEBUG - Duel ID:', data.duelId);
             
             let message = `You've entered a magical duel as the ${data.role.toUpperCase()}`;
             if (data.isCapitolRound) {
@@ -22,20 +25,35 @@ export function initializeDuelHandlers(state: GameStateManager): void {
             }
             addLogEntry(message);
             
-            // Clean up any existing modal state before starting new round
-            cleanupModalState(state);
+            // Check if this is a continuation of an existing duel
+            const isExistingDuel = state.currentDuel && state.currentDuel.id === data.duelId;
             
-            // Store current duel info
-            state.currentDuel = {
-                id: data.duelId,
-                role: data.role,
-                question: data.question,
-                isCapitolRound: data.isCapitolRound,
-                round: data.round,
-                totalRounds: data.totalRounds,
-                shieldsRemaining: data.shieldsRemaining,
-                selectedAnswer: null
-            };
+            if (isExistingDuel) {
+                console.log('🔄 Continuing existing duel - updating round info');
+                // Update round information only
+                if (state.currentDuel) {
+                    state.currentDuel.round = data.round;
+                    state.currentDuel.question = data.question;
+                    state.currentDuel.shieldsRemaining = data.shieldsRemaining;
+                    state.currentDuel.selectedAnswer = null;
+                }
+            } else {
+                // This is a new duel, clean up any existing modal state
+                console.log('🆕 Starting new duel');
+                cleanupModalState(state);
+                
+                // Store current duel info
+                state.currentDuel = {
+                    id: data.duelId,
+                    role: data.role,
+                    question: data.question,
+                    isCapitolRound: data.isCapitolRound,
+                    round: data.round,
+                    totalRounds: data.totalRounds,
+                    shieldsRemaining: data.shieldsRemaining,
+                    selectedAnswer: null
+                };
+            }
 
             const answersContainer = document.getElementById('answers-container');
             if (answersContainer) {
@@ -53,7 +71,9 @@ export function initializeDuelHandlers(state: GameStateManager): void {
     state.socket.on('question', (data: DuelQuestion) => {
         try {
             console.log('📝 Question data:', data);
+            console.log('DEBUG - Current state before showing question:', state.currentDuel);
             showQuestionDialog(data, state);
+            console.log('DEBUG - Current state after showing question:', state.currentDuel);
         } catch (error) {
             console.error('Error showing question dialog:', error);
             cleanupModalState(state);
@@ -62,9 +82,20 @@ export function initializeDuelHandlers(state: GameStateManager): void {
 
     state.socket.on('duel-result', (result: DuelResult) => {
         try {
+            console.log('📊 Received duel result:', result);
             handleDuelResult(result, state);
-            // Only clear current duel if not continuing to next round
-            if (!result.continueToNextRound) {
+            
+            // For capitol battles that continue to next round, don't clear the state
+            if (result.continueToNextRound) {
+                console.log('🔄 Capitol battle continues to next round - keeping duel state');
+                // Update shield count if needed
+                if (result.shieldsRemaining !== undefined && state.currentDuel) {
+                    state.currentDuel.shieldsRemaining = result.shieldsRemaining;
+                    state.currentDuel.round = (result.round || 1) + 1;
+                }
+            } else {
+                // Only clear state if the duel is completely done
+                console.log('🏁 Duel complete - clearing duel state');
                 state.currentDuel = null;
             }
         } catch (error) {
@@ -106,6 +137,55 @@ function showQuestionDialog(duelQuestion: DuelQuestion, state: GameStateManager)
             return;
         }
 
+        // Ensure duel data is consistent
+        console.log('⚔️ Showing question for duel ID:', duelQuestion.duelId);
+        
+        // Always ensure current duel state is up to date
+        if (duelQuestion.duelId) {
+            const isNewDuel = !state.currentDuel || state.currentDuel.id !== duelQuestion.duelId;
+            const isSameRound = state.currentDuel?.round === duelQuestion.round;
+            
+            if (isNewDuel) {
+                console.log('🆕 Setting up new duel from question:', duelQuestion.duelId);
+                // Create or update the duel object with correct ID
+                state.updateCurrentDuel({
+                    id: duelQuestion.duelId,
+                    role: duelQuestion.role === 'observer' ? 'attacker' : duelQuestion.role,
+                    question: duelQuestion.questionData || { 
+                        id: '',
+                        text: duelQuestion.question,
+                        answers: duelQuestion.answers,
+                        correctAnswer: '',
+                        difficulty: 'medium'
+                    },
+                    isCapitolRound: duelQuestion.isCapitolRound,
+                    round: duelQuestion.round,
+                    totalRounds: duelQuestion.totalRounds,
+                    shieldsRemaining: duelQuestion.shieldsRemaining,
+                    selectedAnswer: null
+                });
+            } else if (!isSameRound && state.currentDuel) {
+                console.log('🔄 Updating existing duel for new round:', duelQuestion.round);
+                // Update round information for existing duel
+                state.updateCurrentDuel({
+                    id: state.currentDuel.id,
+                    role: state.currentDuel.role,
+                    isCapitolRound: state.currentDuel.isCapitolRound,
+                    totalRounds: state.currentDuel.totalRounds,
+                    round: duelQuestion.round,
+                    shieldsRemaining: duelQuestion.shieldsRemaining,
+                    question: duelQuestion.questionData || { 
+                        id: '',
+                        text: duelQuestion.question,
+                        answers: duelQuestion.answers,
+                        correctAnswer: '',
+                        difficulty: 'medium'
+                    },
+                    selectedAnswer: null
+                });
+            }
+        }
+
         // Clear any existing timer and event listeners
         if (state.currentModalState?.cleanup) {
             state.currentModalState.cleanup();
@@ -122,7 +202,10 @@ function showQuestionDialog(duelQuestion: DuelQuestion, state: GameStateManager)
                 timerIntervalId = null;
             }
             if (!state.currentModalState?.selectedAnswer && state.socket) {
-                state.socket.emit('duel-answer', { answer: null });
+                state.socket.emit('submit-answer', {
+                    duelId: state.currentDuel?.id,
+                    answer: null
+                });
             }
             state.updateModalState({
                 isOpen: false,
@@ -158,7 +241,11 @@ function showQuestionDialog(duelQuestion: DuelQuestion, state: GameStateManager)
                 }
                 
                 if (state.socket) {
-                    state.socket.emit('duel-answer', { answer });
+                    console.log('DEBUG - Current duel before submitting:', state.currentDuel);
+                    state.socket.emit('submit-answer', {
+                        duelId: state.currentDuel?.id,
+                        answer
+                    });
                 }
                 state.updateModalState({
                     selectedAnswer: answer,
@@ -205,7 +292,7 @@ function showQuestionDialog(duelQuestion: DuelQuestion, state: GameStateManager)
         if (duelQuestion.role === 'attacker' || duelQuestion.role === 'defender') {
             state.updateCurrentDuel({
                 role: duelQuestion.role,
-                id: duelQuestion.questionData?.id || '',
+                id: duelQuestion.duelId || state.currentDuel?.id || '',
                 question: duelQuestion.questionData || { 
                     id: '',
                     text: duelQuestion.question,
@@ -281,78 +368,44 @@ function handleDuelResult(result: DuelResult, state: GameStateManager): void {
             return;
         }
 
+        // Log details for debugging multi-round duels
+        console.log('📊 Handling duel result:', {
+            isCapitolRound: result.isCapitolRound,
+            round: result.round,
+            totalRounds: result.totalRounds,
+            continueToNextRound: result.continueToNextRound,
+            currentDuel: state.currentDuel
+        });
+
         // Remove waiting message if it exists
         if (waitingMessage) {
             waitingMessage.remove();
         }
 
-        // Get the player's role and whether they answered correctly
-        const isAttacker = state.currentDuel?.role === 'attacker';
-        const playerCorrect = isAttacker ? result.attackerCorrect : result.defenderCorrect;
+        // For multi-round duels, we need to keep the modal open but show results
+        const isMultiRound = result.isCapitolRound && result.continueToNextRound;
         
-        // Find the selected button and the correct answer button
-        const buttons = answersContainer.querySelectorAll('.answer-btn');
-        buttons.forEach(button => {
-            const buttonText = button.textContent;
-            if (!buttonText) return;
-
-            // Remove the yellow highlight from the selected answer
-            button.classList.remove('selected');
-
-            // If this was the player's selected answer
-            if (buttonText === state.currentModalState?.selectedAnswer) {
-                // Add red highlight if incorrect, keep yellow if correct
-                button.classList.add(playerCorrect ? 'correct' : 'incorrect');
-            }
-
-            // If this is the correct answer, make it flash green
-            const correctAnswer = state.currentDuel?.question?.correctAnswer?.toString();
-            if (correctAnswer && buttonText === correctAnswer) {
-                button.classList.add('correct', 'flashing');
-                // Also add flashing to the selected answer if it was correct
-                if (buttonText === state.currentModalState?.selectedAnswer && playerCorrect) {
-                    button.classList.add('flashing');
-                }
-            }
-        });
-
-        // Add CSS to the document if it doesn't exist
-        if (!document.getElementById('duel-answer-styles')) {
-            const style = document.createElement('style');
-            style.id = 'duel-answer-styles';
-            style.textContent = `
-                .answer-btn.selected {
-                    background-color: #ffd700 !important;
-                    border-color: #ffd700 !important;
-                }
-                .answer-btn.correct {
-                    background-color: #4CAF50 !important;
-                    border-color: #4CAF50 !important;
-                }
-                .answer-btn.incorrect {
-                    background-color: #f44336 !important;
-                    border-color: #f44336 !important;
-                }
-                .answer-btn.flashing {
-                    animation: flash 1s infinite;
-                }
-                @keyframes flash {
-                    0% { opacity: 1; }
-                    50% { opacity: 0.5; }
-                    100% { opacity: 1; }
-                }
-            `;
-            document.head.appendChild(style);
-        }
-
         // Show the results after a short delay to allow the visual feedback to be seen
         setTimeout(() => {
-            // Continue with the original result display logic
-            cleanupModalState(state);
+            // Explicitly update player stats to ensure they're all displayed
+            updatePlayerStats(state);
             
-            // Hide question container and show duel result
-            questionContainer.classList.add('hidden');
-            duelResult.classList.remove('hidden');
+            // For multi-round duels, don't fully clean up - just prepare for next round
+            if (isMultiRound) {
+                console.log('🔄 Preparing for next round in capitol battle');
+                
+                // Hide question container temporarily and show duel result
+                questionContainer.classList.add('hidden');
+                duelResult.classList.remove('hidden');
+            } else {
+                // For single-round duels or final round, do full cleanup
+                console.log('🏁 Final result - cleaning up modal state');
+                cleanupModalState(state);
+                
+                // Hide question container and show duel result
+                questionContainer.classList.add('hidden');
+                duelResult.classList.remove('hidden');
+            }
             
             // Get player names
             const attacker = state.players.find(p => p.id === result.attacker);
@@ -461,25 +514,34 @@ function handleDuelResult(result: DuelResult, state: GameStateManager): void {
             resultHTML += '</div>';
             duelResult.innerHTML = resultHTML;
 
-            // Show the modal with results
+            // Ensure the modal and result container are visible
             modal.classList.remove('hidden');
+            duelResult.style.display = 'block';
             duelResult.classList.remove('hidden');
 
-            // Update current duel state with shield information if it's a capitol battle
-            if (result.isCapitolRound && state.currentDuel && result.shieldsRemaining !== undefined) {
-                state.currentDuel.shieldsRemaining = result.shieldsRemaining;
-            }
-
-            // Auto-hide after delay, longer for capitol battles
-            const hideDelay = result.continueToNextRound ? 5000 : 3000;
+            // For multi-round duels, set a shorter delay before hiding results
+            const hideDelay = isMultiRound ? 3000 : 5000;
             setTimeout(() => {
-                modal.classList.add('hidden');
-                duelResult.classList.add('hidden');
+                // Update player stats again to ensure correct display
+                updatePlayerStats(state);
                 
-                if (!result.continueToNextRound) {
-                    cleanupModalState(state);
+                if (!isMultiRound) {
+                    // For single-round duels, hide the modal completely
+                    modal.classList.add('hidden');
+                    duelResult.classList.add('hidden');
+                    
+                    // Only clean up if we're not continuing to next round
+                    if (!result.continueToNextRound) {
+                        cleanupModalState(state);
+                    }
+                } else {
+                    // For multi-round duels, just hide the results but keep modal ready for next question
+                    duelResult.classList.add('hidden');
+                    console.log('⏳ Waiting for next round question...');
                 }
-                // Remove the setTimeout for the next question - let the duel-started event handle it
+                
+                // Final update of player stats after everything is done
+                updatePlayerStats(state);
             }, hideDelay);
         }, 1000);
     } catch (error) {
@@ -553,4 +615,4 @@ function handleGameEnd(data: any, state: GameStateManager): void {
     gameEndContainer.innerHTML = html;
     modal.classList.remove('hidden');
     gameEndContainer.classList.remove('hidden');
-} 
+}

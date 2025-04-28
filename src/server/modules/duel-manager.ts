@@ -21,6 +21,8 @@ export class DuelManager {
     }
 
     public getDuel(duelId: string): DuelData | null {
+        console.log('🔍 Looking for duel with ID:', duelId);
+        console.log('🔍 Available duels:', this.gameState.activeDuels.map(d => d.id));
         return this.gameState.activeDuels.find(d => d.id === duelId) || null;
     }
 
@@ -40,8 +42,12 @@ export class DuelManager {
         const shields = isCapitolBattle ? (territory.shields || 2) : 0;
         const totalRounds = isCapitolBattle ? shields + 1 : 1;
 
+        // Make duel ID more predictable and unique
+        const duelId = `duel-${attacker.id}-${defender.id}-${Date.now()}`;
+        console.log('🔍 Creating new duel with ID:', duelId);
+
         const duel: DuelData = {
-            id: Math.random().toString(36).substring(7),
+            id: duelId,
             attacker: attacker.id,
             defender: defender.id,
             question,
@@ -83,6 +89,10 @@ export class DuelManager {
         }
         const answers = this.duelAnswers.get(duelId)!;
         answers.set(playerId, answer);
+        
+        // Store response time for this player
+        const responseTime = Date.now() - duel.startTime;
+        answers.set(playerId + '_time', responseTime.toString());
 
         // Check if both players have answered
         if (!answers.has(duel.attacker) || !answers.has(duel.defender)) {
@@ -91,9 +101,13 @@ export class DuelManager {
 
         const attackerAnswer = answers.get(duel.attacker)!;
         const defenderAnswer = answers.get(duel.defender)!;
+        
+        // Get response times
+        const attackerResponseTime = parseInt(answers.get(duel.attacker + '_time') || '0', 10);
+        const defenderResponseTime = parseInt(answers.get(duel.defender + '_time') || '0', 10);
 
         // Process the result
-        const result = this.processDuelResult(duel, attackerAnswer, defenderAnswer);
+        const result = this.processDuelResult(duel, attackerAnswer, defenderAnswer, attackerResponseTime, defenderResponseTime);
 
         // Clean up if duel is complete
         if (!result.continueToNextRound) {
@@ -112,7 +126,7 @@ export class DuelManager {
         return answer === question.correctAnswer;
     }
 
-    processDuelResult(duel: DuelData, attackerAnswer: string, defenderAnswer: string): DuelResult {
+    processDuelResult(duel: DuelData, attackerAnswer: string, defenderAnswer: string, attackerResponseTime: number, defenderResponseTime: number): DuelResult {
         const attackerCorrect = this.isAnswerCorrect(attackerAnswer, duel.question);
         const defenderCorrect = this.isAnswerCorrect(defenderAnswer, duel.question);
 
@@ -143,8 +157,9 @@ export class DuelManager {
             loser = duel.attacker;
         } else if (attackerCorrect && defenderCorrect) {
             // Both correct - faster response wins
-            const attackerTime = Date.now() - duel.startTime;
-            const defenderTime = Date.now() - duel.startTime;
+            // Calculate individual response times based on when each player answered
+            const attackerTime = attackerResponseTime;
+            const defenderTime = defenderResponseTime;
             
             if (attackerTime <= defenderTime) {
                 winner = duel.attacker;
@@ -244,8 +259,8 @@ export class DuelManager {
             attackerCorrect,
             defenderCorrect,
             territoryTransferred,
-            attackerResponseTime: ((Date.now() - duel.startTime) / 1000).toFixed(1) + 's',
-            defenderResponseTime: ((Date.now() - duel.startTime) / 1000).toFixed(1) + 's',
+            attackerResponseTime: ((attackerResponseTime / 1000).toFixed(1) + 's'),
+            defenderResponseTime: ((defenderResponseTime / 1000).toFixed(1) + 's'),
             contestedTerritoryId: duel.contestedTerritoryId,
             isCapitolRound: isCapitolBattle,
             round: duelState?.round || 1,
